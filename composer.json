@@ -1,0 +1,35 @@
+{
+  "name": "lulanyin/annotation",
+  "description": "PHP应用服务",
+  "keywords": [
+    "php http",
+    "php websocket",
+    "php http service",
+    "php websocket service"
+  ],
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "lulanyin",
+      "email": "me@lanyin.lu"
+    }
+  ],
+  "require": {
+    "php": "^7.2"
+  },
+  "require-dev": {
+    "swoft/swoole-ide-helper": "dev-master"
+  },
+  "autoload": {
+    "psr-4": {
+      "Small\\Service\\" : "src/"
+    }
+  },
+  "repositories": {
+    "packagist": {
+      "type": "composer",
+      "url": "https://mirrors.aliyun.com/composer/"
+    }
+  }
+}

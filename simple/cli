@@ -1,12 +1,10 @@
-# PHP 应用服务
+#!/usr/bin/env php
+<?php
+require "config.php";
 
-### 配置
-```php
-//定义常量，此常量可以是文件路径，也可以直接是值
-define("SERVICE_CONFIG", ROOT."/config/service.php");
-
-//ROOT."/config/service.php"
-return [
+//定义服务类型，SWOOLE，必须定义为此值
+define("SERVICE_PROVIDER", SWOOLE);
+define("SERVICE_CONFIG", [
     //debug 调试是否打开
     "debug" => true,
     //服务总开关，如果关闭，所有服务不可用
@@ -16,7 +14,7 @@ return [
         //http 路由
         "http"      => [
             //入口前缀位置，使用命名空间
-            "home"  => "app\http\\\\",
+            "home"  => "app\http\\",
             //默认域名打开进入的位置，对应下方 list 的一个 key
             "default"   => "public",
             //路由列表，仅对应第一层文件夹，key 替换为地址的值， value 为访问入口的命名空间，请勿重复，并且请勿使用 PHP 系统变量、关键字
@@ -61,9 +59,7 @@ return [
             ]
         ]
     ]
-];
-```
+]);
 
-#### Http
-
-#### WebSocket
+$service = new \Small\Service\Http\Service();
+$service->start();
