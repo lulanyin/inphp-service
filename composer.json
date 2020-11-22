@@ -16,14 +16,16 @@
     }
   ],
   "require": {
-    "php": "^7.2"
+    "php": "^7.2",
+    "ext-json": "*"
   },
   "require-dev": {
     "swoft/swoole-ide-helper": "dev-master"
   },
   "autoload": {
     "psr-4": {
-      "Small\\Service\\" : "src/"
+      "Small\\Service\\" : "src/",
+      "SimpleService\\" : "simple/"
     }
   },
   "repositories": {

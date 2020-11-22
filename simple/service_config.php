@@ -1,12 +1,4 @@
-# PHP 应用服务
-
-### 配置
-```php
-//定义常量，此常量可以是文件路径，也可以直接是值
-define("SERVICE_CONFIG", ROOT."/config/service_config.php");
-
-//ROOT."/config/service_config.php"
-
+<?php
 return [
     //debug 调试是否打开
     "debug" => true,
@@ -17,7 +9,7 @@ return [
         //http 路由
         "http"      => [
             //入口前缀位置，使用命名空间
-            "home"  => "SimpleService\app\http\\\\",
+            "home"  => "SimpleService\app\http\\",
             //视图文件位置
             "view"  => ROOT."/resources/view/",
             //是否允许执行PHP
@@ -116,8 +108,3 @@ return [
         ]
     ]
 ];
-```
-
-#### Http
-
-#### WebSocket
