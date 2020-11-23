@@ -53,6 +53,7 @@ class Router
         if(strrchr($path, "/")=="/"){
             $path = substr($path, 0, -1);
         }
+
         //谷歌浏览器的 favicon.ico 请求
         if($path == 'favicon.ico'){
             //
@@ -62,7 +63,19 @@ class Router
                 "state"         => 'favicon.ico',
                 "controller"    => null,
                 "method"        => null,
-                "view"          => 'favicon.ico'
+                "view"          => null
+            ]);
+        }
+
+        //OPTIONS请求
+        if($this->client->method == 'OPTIONS'){
+            return new Status([
+                "status"        => 200,
+                "message"       => "ok",
+                "state"         => 'options',
+                "controller"    => null,
+                "method"        => null,
+                "view"          => null
             ]);
         }
 

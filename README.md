@@ -6,7 +6,6 @@
 define("SERVICE_CONFIG", ROOT."/config/service_config.php");
 
 //ROOT."/config/service_config.php"
-
 return [
     //debug 调试是否打开
     "debug" => true,
@@ -17,7 +16,7 @@ return [
         //http 路由
         "http"      => [
             //入口前缀位置，使用命名空间
-            "home"  => "SimpleService\app\http\\\\",
+            "home"  => "SimpleService\app\http\\",
             //视图文件位置
             "view"  => ROOT."/resources/view/",
             //是否允许执行PHP
@@ -63,7 +62,7 @@ return [
     ],
     "cookie" => [
         //HTTPS
-        "secure"   => true,
+        "secure"   => false,
         //http only
         "http_only"=> true,
         //混淆加密字符串
@@ -87,7 +86,7 @@ return [
             "listen_dir" => [ROOT."/app", VIEW],
             //swoole http server 配置
             "settings"  => [
-                //PID文件保存位置
+                //PID文件保存位置，文件夹必须存在
                 'pid_file'              => ROOT.'/runtime/http_service.pid',
                 //worker 数量，一般按CPU核心数量 * 2
                 'worker_num'            => 2,
@@ -98,12 +97,15 @@ return [
                 //
                 'daemonize'             => 0,
                 'dispatch_mode'         => 2,
+                //日志文件，文件夹必须存在
                 'log_file'              => ROOT.'/runtime/log/http_service.log',
                 //默认异步进程数量
                 'task_worker_num'       => 0,
                 'package_max_length'    => 8092,
                 'upload_tmp_dir'        => ROOT.'/runtime/upload',
+                //默认静态文件目录，文件夹必须存在，一般使用nginx代理完成静态文件访问
                 'document_root'         => ROOT.'/public',
+                //文件上传保存文件夹
                 'upload_dir'            => ROOT.'/public/attachment'
             ],
             //由于 swoole 服务无法提供像 PHP-FPM 一样的 session 数据，则需要另行实现， 如果有必要，可以使用中间键自行实现

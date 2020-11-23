@@ -9,6 +9,11 @@ use Small\Service\Object\Status;
 class Response implements IResponse
 {
     /**
+     * @var \Swoole\Http\Response
+     */
+    private $swoole_response = null;
+
+    /**
      * cookies
      * @var Cookie[]
      */
@@ -36,7 +41,13 @@ class Response implements IResponse
      * http状态码
      * @var int
      */
-    private $status = 200;
+    private $status_code = 200;
+
+    /**
+     * 状态数据
+     * @var Status
+     */
+    private $status;
 
     /**
      * http版本，1.1, 2.0
@@ -59,10 +70,11 @@ class Response implements IResponse
     /**
      * 初始化
      * Response constructor.
+     * @param \Swoole\Http\Response|null $response
      */
-    public function __construct()
+    public function __construct(\Swoole\Http\Response $response = null)
     {
-        
+        $this->swoole_response = $response;
     }
 
     /**
@@ -75,15 +87,20 @@ class Response implements IResponse
         //状态码
         $this->withStatus($status->status);
         $this->path = $status->path;
+        $this->status = $status;
 
         $controller = null;
         if($status->status == 200){
+            if($status->state == 'options' || $status->state == 'favicon.ico'){
+                return $this->processOptions();
+            }
             if(!empty($status->controller)){
                 //控制器
                 $controllerName = $status->controller;
                 $controller = new $controllerName();
             }
         }
+
         //中间键
         $config = Container::getConfig();
         $middleware = $config['router']['http']['middleware'] ?? [];
@@ -128,18 +145,18 @@ class Response implements IResponse
         }
 
         //可以使用中间键完成模板渲染，如果都未处理，则默认使用PHP去处理视图文件
-        if(empty($this->content) && file_exists($status->view)){
+        if(empty($this->content) && file_exists($status->view) && $status->status == 200){
             //还未设置响应内容，默认展示模板
             $view_php = $config['router']['http']['view_php'] ?? false;
             if($view_php){
                 //允许执行PHP
                 ob_start();
                 include $status->view;
-                $this->withContent(ob_get_contents());
+                $this->withHTML(ob_get_contents());
                 ob_clean();
             }else{
                 //不执行PHP，按文件内容展示
-                $this->withContent(file_get_contents($status->view));
+                $this->withHTML(file_get_contents($status->view));
             }
         }
         //返回本身
@@ -155,6 +172,21 @@ class Response implements IResponse
     public function withHeader(string $key, $value){
         $this->headers[$key] = is_array($value) ? $value : [$value];
         return $this;
+    }
+
+    /**
+     * 输出header
+     * @param string $name
+     * @param string $value
+     */
+    public function header(string $name, string $value)
+    {
+        // TODO: Implement header() method.
+        if($this->swoole_response){
+            $this->swoole_response->header($name, $value);
+        }else{
+            header($name.":".$value, false, $this->status_code);
+        }
     }
 
     /**
@@ -192,6 +224,55 @@ class Response implements IResponse
     }
 
     /**
+     * 保存cookie
+     * @param string $name
+     * @param string $value
+     * @param int $time
+     * @return Response
+     */
+    public function cookie(string $name, string $value, int $time = 3600){
+        return $this->withCookie($name, $value, $time);
+    }
+
+    /**
+     * 输出cookie
+     */
+    public function sendCookies(){
+        $config = Container::getConfig();
+        //获取客户端
+        $client = Container::getClient();
+        //跨域共享域名
+        $domains = $config['cookie']['domains'] ?? [];
+        $domains = is_array($domains) ? $domains : [];
+        //得到当前请求的域名
+        $domains[] = $client->host;
+        foreach ($this->cookies as $cookie){
+            $name = $cookie['name'];
+            $value = $cookie['value'];
+            $time = $cookie['time'];
+            //混淆加密字符
+            $key = $config['cookie']['hash_key'] ?? '1a2b3c5g';
+            //加密值
+            $hash = hash_hmac("sha1", $value, $key);
+            //保存位置
+            $path = $config['cookie']['path'] ?? "/";
+            $client->cookie = $client->cookie ?? [];
+            $client->cookie[$name] = $value;
+            $client->cookie[$name."_hash"] = $hash;
+            //每个域名都保存一次
+            foreach ($domains as $domain){
+                if($this->swoole_response){
+                    $this->swoole_response->cookie($name, $value, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
+                    $this->swoole_response->cookie($name."_hash", $hash, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
+                }else{
+                    setcookie($name, $value, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
+                    setcookie($name."_hash", $hash, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
+                }
+            }
+        }
+    }
+
+    /**
      * 移除cookie
      * @param $name
      * @return Response
@@ -206,7 +287,7 @@ class Response implements IResponse
      * @return Response
      */
     public function withStatus(int $code){
-        $this->status = $code;
+        $this->status_code = $code;
         return $this;
     }
 
@@ -217,6 +298,15 @@ class Response implements IResponse
      */
     public function withJson($object){
         return $this->withHeader("Content-Type", "application/json")->withContent($object);
+    }
+
+    /**
+     * 输出HTML
+     * @param $HTML
+     * @return Response
+     */
+    public function withHTML($HTML){
+        return $this->withHeader("Content-Type", "text/html")->withContent($HTML);
     }
 
     /**
@@ -267,9 +357,7 @@ class Response implements IResponse
         }
         //处理cookies
         if(!empty($this->cookies)){
-            foreach ($this->cookies as $cookie){
-                Request::setCookie($cookie['name'], $cookie['value'], $cookie['time']);
-            }
+            $this->sendCookies();
         }
         //加入跨域
         //查找是否配置有独立域名
@@ -278,26 +366,28 @@ class Response implements IResponse
         }
         //加入编码
         $this->withAddHeader("Content-Type", "charset={$this->charset}");
-        //
-        $response = Container::getResponse();
-        print_r($response->cookie);
-
         //处理headers
         if(!empty($this->headers)){
             foreach ($this->headers as $name=>$header){
-                if(Container::isSwoole()){
-                    $response->header($name, implode(";", $header));
-                }else{
-                    header($name.":".implode(";", $header), false, $this->status);
-                }
+                $this->header($name, implode(";", $header));
             }
         }
-        if(Container::isSwoole()){
-            $response->end($this->content ?? '');
-        }else{
-            echo $this->content ?? '';
-        }
+        $this->end($this->content ?? '');
         $this->hasSend = true;
+    }
+
+    /**
+     * 响应结束
+     * @param string $content
+     */
+    public function end(string $content)
+    {
+        // TODO: Implement end() method.
+        if($this->swoole_response){
+            $this->swoole_response->end($content);
+        }else{
+            echo $content;
+        }
     }
 
     /**
@@ -371,11 +461,9 @@ class Response implements IResponse
     /**
      * 直接输出状态码
      * @param int $code
-     * @return Response
      */
     public function sendStatus(int $code){
-        $this->withHeader("Content-Type", "charset={$this->charset}");
-        return $this;
+        $this->withHeader("Content-Type", "charset={$this->charset}")->withStatus($code)->send();
     }
 
     /**
@@ -395,9 +483,8 @@ class Response implements IResponse
      * @param int $status
      */
     public function redirect(string $uri, $status = 302){
-        if(Container::isSwoole()){
-            $response = Container::getResponse();
-            $response->redirect($uri, $status);
+        if($this->swoole_response){
+            $this->swoole_response->redirect($uri, $status);
         }else{
             $this->withStatus($status);
             $this->withHeader("Location", $uri)->send();

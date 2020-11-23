@@ -30,9 +30,14 @@ class Container
      */
     public static function get(string $name){
         if(self::isSwoole()){
+            $context = Coroutine::getContext();
+            //assert($context instanceof Coroutine\Context);
+            return $context[$name] ?? null;
+            /*
             $coroutine_id = Coroutine::getCid();
             $containers = self::$containers[$coroutine_id] ?? [];
             return $containers[$name] ?? null;
+            */
         }else{
             return self::$containers[$name] ?? null;
         }
@@ -45,9 +50,12 @@ class Container
      */
     public static function set(string $name, $value){
         if(self::isSwoole()){
+            Coroutine::getContext()[$name] = $value;
+            /*
             $coroutine_id = Coroutine::getCid();
             self::$containers[$coroutine_id] = self::$containers[$coroutine_id] ?? [];
             self::$containers[$coroutine_id][$name] = $value;
+            */
         }else{
             self::$containers[$name] = $value;
         }
@@ -55,7 +63,7 @@ class Container
 
     /**
      * 获取临时 Request
-     * @return \Swoole\Http\Request|Request
+     * @return \Swoole\Http\Request
      */
     public static function getRequest(){
         return self::get("request");
@@ -71,7 +79,7 @@ class Container
 
     /**
      * 获取临时 Response
-     * @return \Swoole\Http\Response|Response
+     * @return Response
      */
     public static function getResponse(){
         return self::get("response");

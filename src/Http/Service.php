@@ -20,6 +20,46 @@ class Service implements IService
      */
     private $http_server;
 
+    /**
+     * swoole http server 绑定的IP
+     * @var string
+     */
+    private $ip = '127.0.0.1';
+
+    /**
+     * Swoole http server 的端口
+     * @var int
+     */
+    private $port = 1990;
+
+    /**
+     * 默认设置
+     * @var array|mixed
+     */
+    private $server_setting = [
+        //PID文件保存位置，文件夹必须存在
+        'pid_file'              => ROOT.'/runtime/http_service.pid',
+        //worker 数量，一般按CPU核心数量 * 2
+        'worker_num'            => 2,
+        //最大请求数量，按需，不可超过系统设置
+        'max_request'           => 24,
+        //最大连接数量
+        'max_connection'        => 128,
+        //
+        'daemonize'             => 0,
+        'dispatch_mode'         => 2,
+        //日志文件，文件夹必须存在
+        'log_file'              => ROOT.'/runtime/log/http_service.log',
+        //默认异步进程数量
+        'task_worker_num'       => 0,
+        'package_max_length'    => 8092,
+        'upload_tmp_dir'        => ROOT.'/runtime/upload',
+        //默认静态文件目录，文件夹必须存在，一般使用nginx代理完成静态文件访问
+        'document_root'         => ROOT.'/public',
+        //文件上传保存文件夹
+        'upload_dir'            => ROOT.'/public/attachment'
+    ];
+
     //返回的控制器类型
     const CONTROLLER = 'controller';
     const HTML       = 'html';
@@ -41,22 +81,25 @@ class Service implements IService
         if(SERVICE_PROVIDER == SWOOLE){
             //由 swoole 提供服务
             //处理获得请求路径，交给路由处理
-            $this->http_server = new Server($config['swoole']['http']['ip'], $config['swoole']['http']['port']);
-            $this->http_server->set($config['swoole']['http']['settings']);
-            $this->http_server->on("request", function (\Swoole\Http\Request $request, \Swoole\Http\Response $response) use($config){
+            $this->ip = $config['swoole']['http']['ip'] ?? $this->ip;
+            $this->port = $config['swoole']['http']['port'];
+            $this->server_setting = $config['swoole']['http']['settings'] ?? $this->server_setting;
+            $this->http_server = new Server($this->ip, $this->port);
+            $this->http_server->set($this->server_setting);
+            //
+            $this->http_server->on("request", function (\Swoole\Http\Request $swoole_request, \Swoole\Http\Response $swoole_response) use($config){
                 //保存
-                Container::setRequest($request);
-                Container::setResponse($response);
+                Container::setRequest($swoole_request);
                 //主域名
-                $host = $request->header['host'];
-                $ip = $request->header['x-real-ip'] ?? ($request->server['remote_addr'] ?? null);
+                $host = $swoole_request->header['host'];
+                $ip = $swoole_request->header['x-real-ip'] ?? ($swoole_request->server['remote_addr'] ?? null);
                 //请求方式
-                $method = $request->server['request_method'];
+                $method = $swoole_request->server['request_method'];
                 //路径信息
-                $path = $request->server['path_info'] ?? '';
-                $uri = $request->server['request_uri'] ?? '';
+                $path = $swoole_request->server['path_info'] ?? '';
+                $uri = $swoole_request->server['request_uri'] ?? '';
                 $path = !empty($path) ? $path : $uri;
-                $http_x_requested_with = $request->header['http_x_requested_with'] ?? null;
+                $http_x_requested_with = $swoole_request->header['http_x_requested_with'] ?? null;
                 //交给路由处理，由HTTP控制器处理数据返回，得到数据
                 Container::setClient(new Client([
                     "https"     => null,
@@ -64,27 +107,30 @@ class Service implements IService
                     "ip"        => $ip,
                     "method"    => $method,
                     "ajax"      => $http_x_requested_with == 'XMLHttpRequest',
-                    //"session"   => Session::get(),
-                    "cookie"    => $request->cookie,
-                    "get"       => $request->get,
-                    "post"      => $request->post,
-                    "files"     => $request->files,
-                    "raw_post_data" => $request->rawContent(),
+                    //"session"   => Session::get(), 由于未初始化，不可使用 Session
+                    "cookie"    => $swoole_request->cookie,
+                    "get"       => $swoole_request->get,
+                    "post"      => $swoole_request->post,
+                    "files"     => $swoole_request->files,
+                    "raw_post_data" => $swoole_request->rawContent(),
                     "uri"       => $path
                 ]));
+                //创建一个Response对象
+                $response = new Response($swoole_response);
+                Container::setResponse($response);
                 // session 需要在之后设置
                 Container::updateClient("session", Session::get());
                 $status = (new Router())->start();
                 //得到路由状态对象，交由 Response 处理，响应数据给客户端
-                (new Response())->start($status)->send();
+                $response->start($status)->send();
             });
             //自动重启线程
             $this->autoReloadProcessor = new Process([$this, "reload"]);
             $this->http_server->addProcess($this->autoReloadProcessor);
             $this->http_server->on("WorkerStart", function (Server $server, int $worker_id){
                 if($worker_id == 0){
-                    echo "主进程已启动...".PHP_EOL;
-                    echo "运行自动重载线程...".PHP_EOL;
+                    $ip = $this->ip == '0.0.0.0' ? '127.0.0.1' : $this->ip;
+                    echo "主进程已启动，web服务地址是：http://{$ip}:{$this->port}".PHP_EOL;
                     $this->autoReload($server);
                 }
             });
@@ -99,7 +145,6 @@ class Service implements IService
      */
     public function start()
     {
-        print_r($_SERVER);
         // TODO: Implement start() method.
         if(SERVICE_PROVIDER == SWOOLE){
             $this->http_server->start();
@@ -130,9 +175,12 @@ class Service implements IService
                 "uri"       => $path,
                 "ajax"      => $http_x_requested_with == 'XMLHttpRequest'
             ]));
+            //初始化一个 Response 对象
+            $response = new Response();
+            Container::setResponse($response);
             $status = (new Router())->start();
             //得到路由状态对象，交由 Response 处理，响应数据给客户端
-            (new Response())->start($status)->send();
+            $response->start($status)->send();
         }
     }
 

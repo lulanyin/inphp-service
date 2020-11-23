@@ -1,8 +1,6 @@
 <?php
 namespace Small\Service\Http;
 
-use Small\Service\IRequest;
-
 class Request
 {
     /**
@@ -72,40 +70,13 @@ class Request
     /**
      * 保存 Cookie
      * @param string $name
-     * @param $value
+     * @param string $value
      * @param int $time
      */
-    public static function setCookie(string $name, $value, $time = 3600){
-        $config = Container::getConfig();
-        //混淆加密字符
-        $key = $config['cookie']['hash_key'] ?? '1a2b3c5g';
-        //加密值
-        $hash = hash_hmac("sha1", $value, $key);
-        //跨域共享域名
-        $domains = $config['cookie']['domains'] ?? [];
-        $domains = is_array($domains) ? $domains : [];
-        //保存位置
-        $path = $config['cookie']['path'] ?? "/";
-        //获取客户端
-        $client = Container::getClient();
-        $client->cookie = $client->cookie ?? [];
-        $client->cookie[$name] = $value;
-        $client->cookie[$name."_hash"] = $hash;
-        //得到当前请求的域名
-        $domains[] = $client->host;
+    public static function setCookie(string $name, string $value, $time = 3600){
         //获取对象
         $response = Container::getResponse();
-        //每个域名都保存一次
-        foreach ($domains as $domain){
-            if(Container::isSwoole()){
-                $response->cookie($name, $value, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
-                $response->cookie($name."_hash", $hash, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
-            }else{
-                setcookie($name, $value, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
-                setcookie($name."_hash", $hash, time() + $time, $path, $domain, $config['cookie']['secure'], $config['cookie']['http_only']);
-            }
-        }
-        Container::setResponse($response);
+        $response->withCookie($name, $value, $time);
     }
 
     /**

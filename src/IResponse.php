@@ -8,9 +8,7 @@ namespace Small\Service;
  */
 interface IResponse
 {
-    /**
-     * 发送数据给客户端
-     * @return mixed
-     */
-    public function send();
+    public function cookie(string $name, string $value, int $time = 3600);
+    public function header(string $name, string $value);
+    public function end(string $content);
 }
