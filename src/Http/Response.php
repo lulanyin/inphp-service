@@ -11,37 +11,37 @@ class Response implements IResponse
     /**
      * @var \Swoole\Http\Response
      */
-    private $swoole_response = null;
+    public $swoole_response = null;
 
     /**
      * cookies
      * @var Cookie[]
      */
-    private $cookies = [];
+    public $cookies = [];
 
     /**
      * 编码
      * @var string
      */
-    private $charset = "UTF-8";
+    public $charset = "UTF-8";
 
     /**
      * header
      * @var array
      */
-    private $headers = [];
+    public $headers = [];
 
     /**
      * 主体内容
      * @var null
      */
-    private $content = null;
+    public $content = null;
 
     /**
      * http状态码
      * @var int
      */
-    private $status_code = 200;
+    public $status_code = 200;
 
     /**
      * 状态数据
@@ -145,18 +145,19 @@ class Response implements IResponse
         }
 
         //可以使用中间键完成模板渲染，如果都未处理，则默认使用PHP去处理视图文件
-        if(empty($this->content) && file_exists($status->view) && $status->status == 200){
+        $view_dir = $config['router']['http']['view'];
+        if(empty($this->content) && file_exists($view_dir.$status->view) && $status->status == 200){
             //还未设置响应内容，默认展示模板
             $view_php = $config['router']['http']['view_php'] ?? false;
             if($view_php){
                 //允许执行PHP
                 ob_start();
-                include $status->view;
+                include $view_dir.$status->view;
                 $this->withHTML(ob_get_contents());
                 ob_clean();
             }else{
                 //不执行PHP，按文件内容展示
-                $this->withHTML(file_get_contents($status->view));
+                $this->withHTML(file_get_contents($view_dir.$status->view));
             }
         }
         //返回本身

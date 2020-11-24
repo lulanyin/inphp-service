@@ -156,7 +156,7 @@ class Router
                     "state"         => Service::HTML,
                     "controller"    => class_exists($controller) ? $controller : null,
                     "method"        => "index",
-                    "view"          => $html_file,
+                    "view"          => join("/", $pathArray),
                     "path"          => reset($pathArray)
                 ]);
             }else{
