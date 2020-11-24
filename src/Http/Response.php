@@ -47,13 +47,13 @@ class Response implements IResponse
      * 状态数据
      * @var Status
      */
-    private $status;
+    public $status;
 
     /**
      * http版本，1.1, 2.0
      * @var string
      */
-    private $version = "1.1";
+    public $version = "1.1";
 
     /**
      * 控制器的路径

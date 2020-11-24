@@ -1,6 +1,8 @@
 <?php
 namespace Inphp\Service;
 
+use Inphp\Service\Http\Response;
+
 /**
  * 服务中间件
  * Interface IMiddleWare
@@ -8,5 +10,5 @@ namespace Inphp\Service;
  */
 interface IMiddleWare
 {
-    public static function process(&$response = null, &$controller = null, string $method = null);
+    public static function process(Response $response, $controller = null, string $method = null);
 }
