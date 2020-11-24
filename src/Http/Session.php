@@ -1,6 +1,9 @@
 <?php
 namespace Inphp\Service\Http;
 
+use Inphp\Service\IMiddleWare;
+use Inphp\Service\ISessionMiddleWare;
+
 class Session
 {
 
@@ -18,8 +21,12 @@ class Session
                 $config = Container::getConfig();
                 $session_set = $config['swoole']["http"]["session"];
                 switch($session_set['driver']){
-                    case "---" :
-                        //未设置
+                    case "middleware":
+                        //使用中间键处理
+                        if($session_set['middleware']["get"] instanceof ISessionMiddleWare){
+                            $middleware = new $session_set['middleware']["get"]($php_session_id);
+                            return $middleware->get($name, $default);
+                        }
                         break;
                     default :
                         $file_path = $session_set['file_path'];
@@ -68,8 +75,12 @@ class Session
             $config = Container::getConfig();
             $session_set = $config['swoole']["http"]["session"];
             switch($session_set['driver']){
-                case "---" :
-                    //未设置
+                case "middleware":
+                    //使用中间键处理
+                    if($session_set['middleware']["set"] instanceof ISessionMiddleWare){
+                        $middleware = new $session_set['middleware']["set"]($php_session_id);
+                        return $middleware->set($name, $value);
+                    }
                     break;
                 default :
                     $file_path = $session_set['file_path'];
@@ -117,8 +128,12 @@ class Session
                 $config = Container::getConfig();
                 $session_set = $config['swoole']["http"]["session"];
                 switch($session_set['driver']){
-                    case "---" :
-                        //未设置
+                    case "middleware":
+                        //使用中间键处理
+                        if($session_set['middleware']["drop"] instanceof ISessionMiddleWare){
+                            $middleware = new $session_set['middleware']["drop"]($php_session_id);
+                            return $middleware->drop($name);
+                        }
                         break;
                     default :
                         $file_path = $session_set['file_path'];
