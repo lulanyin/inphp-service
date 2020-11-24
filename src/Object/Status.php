@@ -1,12 +1,12 @@
 <?php
-namespace Small\Service\Object;
+namespace Inphp\Service\Object;
 
-use Small\Service\Http\Service;
+use Inphp\Service\Http\Service;
 
 /**
  * 路由状态
  * Class Status
- * @package Small\Service\Object
+ * @package Inphp\Service\Object
  */
 class Status
 {

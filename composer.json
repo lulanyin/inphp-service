@@ -1,5 +1,5 @@
 {
-  "name": "lulanyin/annotation",
+  "name": "inphp/service",
   "description": "PHP应用服务",
   "keywords": [
     "php http",
@@ -24,7 +24,7 @@
   },
   "autoload": {
     "psr-4": {
-      "Small\\Service\\" : "src/",
+      "Inphp\\Service\\" : "src/",
       "SimpleService\\" : "simple/"
     }
   },

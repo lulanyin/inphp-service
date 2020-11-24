@@ -1,5 +1,5 @@
 <?php
-namespace Small\Service\Http;
+namespace Inphp\Service\Http;
 
 class Session
 {

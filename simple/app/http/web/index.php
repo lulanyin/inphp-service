@@ -1,7 +1,7 @@
 <?php
 namespace SimpleService\app\http\web;
 
-use Small\Service\Http\Session;
+use Inphp\Service\Http\Session;
 
 class index{
 

@@ -1,5 +1,5 @@
 <?php
-namespace Small\Service\Util;
+namespace Inphp\Service\Util;
 
 class File{
     /**

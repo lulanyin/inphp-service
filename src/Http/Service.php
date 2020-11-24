@@ -1,16 +1,16 @@
 <?php
-namespace Small\Service\Http;
+namespace Inphp\Service\Http;
 
-use Small\Service\IService;
-use Small\Service\Object\Client;
-use Small\Service\Util\File;
+use Inphp\Service\IService;
+use Inphp\Service\Object\Client;
+use Inphp\Service\Util\File;
 use Swoole\Http\Server;
 use Swoole\Process;
 
 /**
  * 服务
  * Class Service
- * @package Small\Service\Http
+ * @package Inphp\Service\Http
  */
 class Service implements IService
 {

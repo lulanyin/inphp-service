@@ -1,9 +1,9 @@
 <?php
-namespace Small\Service\Object;
+namespace Inphp\Service\Object;
 
 /**
  * Class Cookie
- * @package Small\Service\Object
+ * @package Inphp\Service\Object
  */
 class Cookie {
 

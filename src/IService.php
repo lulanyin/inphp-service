@@ -1,5 +1,5 @@
 <?php
-namespace Small\Service;
+namespace Inphp\Service;
 
 /**
  * 服务接口

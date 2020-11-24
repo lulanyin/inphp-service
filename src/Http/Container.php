@@ -1,13 +1,13 @@
 <?php
-namespace Small\Service\Http;
+namespace Inphp\Service\Http;
 
-use Small\Service\Object\Client;
+use Inphp\Service\Object\Client;
 use Swoole\Coroutine;
 
 /**
  * 临时对象保存
  * Class Container
- * @package Small\Service\Http
+ * @package Inphp\Service\Http
  */
 class Container
 {

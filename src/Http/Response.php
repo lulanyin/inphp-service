@@ -1,10 +1,10 @@
 <?php
-namespace Small\Service\Http;
+namespace Inphp\Service\Http;
 
-use Small\Service\IMiddleWare;
-use Small\Service\IResponse;
-use Small\Service\Object\Cookie;
-use Small\Service\Object\Status;
+use Inphp\Service\IMiddleWare;
+use Inphp\Service\IResponse;
+use Inphp\Service\Object\Cookie;
+use Inphp\Service\Object\Status;
 
 class Response implements IResponse
 {

@@ -1,13 +1,13 @@
 <?php
-namespace Small\Service\Http;
+namespace Inphp\Service\Http;
 
-use Small\Service\Object\Client;
-use Small\Service\Object\Status;
+use Inphp\Service\Object\Client;
+use Inphp\Service\Object\Status;
 
 /**
  * 路由处理器
  * Class Router
- * @package Small\Service\Http
+ * @package Inphp\Service\Http
  */
 class Router
 {

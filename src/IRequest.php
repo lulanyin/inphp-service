@@ -1,5 +1,5 @@
 <?php
-namespace Small\Service;
+namespace Inphp\Service;
 
 interface IRequest
 {

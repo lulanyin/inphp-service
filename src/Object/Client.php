@@ -1,10 +1,10 @@
 <?php
-namespace Small\Service\Object;
+namespace Inphp\Service\Object;
 
 /**
  * 客户端数据对象
  * Class Client
- * @package Small\Service\Object
+ * @package Inphp\Service\Object
  */
 class Client
 {
