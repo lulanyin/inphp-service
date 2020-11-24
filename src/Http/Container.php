@@ -1,6 +1,7 @@
 <?php
 namespace Inphp\Service\Http;
 
+use Inphp\Service\Context;
 use Inphp\Service\Object\Client;
 use Swoole\Coroutine;
 
@@ -11,12 +12,6 @@ use Swoole\Coroutine;
  */
 class Container
 {
-    /**
-     * 临时对象
-     * @var array
-     */
-    public static $containers = [];
-
     /**
      * 配置
      * @var array
@@ -29,18 +24,7 @@ class Container
      * @return mixed|null
      */
     public static function get(string $name){
-        if(self::isSwoole()){
-            $context = Coroutine::getContext();
-            //assert($context instanceof Coroutine\Context);
-            return $context[$name] ?? null;
-            /*
-            $coroutine_id = Coroutine::getCid();
-            $containers = self::$containers[$coroutine_id] ?? [];
-            return $containers[$name] ?? null;
-            */
-        }else{
-            return self::$containers[$name] ?? null;
-        }
+        return Context::get($name);
     }
 
     /**
@@ -49,16 +33,7 @@ class Container
      * @param $value
      */
     public static function set(string $name, $value){
-        if(self::isSwoole()){
-            Coroutine::getContext()[$name] = $value;
-            /*
-            $coroutine_id = Coroutine::getCid();
-            self::$containers[$coroutine_id] = self::$containers[$coroutine_id] ?? [];
-            self::$containers[$coroutine_id][$name] = $value;
-            */
-        }else{
-            self::$containers[$name] = $value;
-        }
+        Context::set($name, $value);
     }
 
     /**
