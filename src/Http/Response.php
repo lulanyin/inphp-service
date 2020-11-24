@@ -146,18 +146,18 @@ class Response implements IResponse
 
         //可以使用中间键完成模板渲染，如果都未处理，则默认使用PHP去处理视图文件
         $view_dir = $config['router']['http']['view'];
-        if(empty($this->content) && file_exists($view_dir.$status->view) && $status->status == 200){
+        if(empty($this->content) && file_exists($view_dir.$this->path."/".$status->view) && $status->status == 200){
             //还未设置响应内容，默认展示模板
             $view_php = $config['router']['http']['view_php'] ?? false;
             if($view_php){
                 //允许执行PHP
                 ob_start();
-                include $view_dir.$status->view;
+                include $view_dir.$this->path."/".$status->view;
                 $this->withHTML(ob_get_contents());
                 ob_clean();
             }else{
                 //不执行PHP，按文件内容展示
-                $this->withHTML(file_get_contents($view_dir.$status->view));
+                $this->withHTML(file_get_contents($view_dir.$this->path."/".$status->view));
             }
         }
         //返回本身

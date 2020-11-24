@@ -156,7 +156,7 @@ class Router
                     "state"         => Service::HTML,
                     "controller"    => class_exists($controller) ? $controller : null,
                     "method"        => "index",
-                    "view"          => join("/", $pathArray),
+                    "view"          => join("/", array_slice($pathArray, 1)),
                     "path"          => reset($pathArray)
                 ]);
             }else{
@@ -191,6 +191,11 @@ class Router
             $method = end($pathArray);
             $pathArray = array_slice($pathArray, 0, -1);
         }
+        $view_file_name = str_replace("\\", "/", $className);
+        $view_file_path_array = array_slice(explode("/", $view_file_name), 1);
+        $view_file = join("/", $view_file_path_array);
+        $view_suffix = $router['view_suffix'];
+        $view_file = strrchr($view_file, ".{$view_suffix}") == ".{$view_suffix}" ? $view_file : "{$view_file}.{$view_suffix}";
         //进行类判断，使用反射方法
         try {
             //使用反射类，查看方法是否是公共方法，否则也无法使用，如果方法不存在，则也无法使用
@@ -212,9 +217,6 @@ class Router
             if(!in_array($method, $enableMethodList)){
                 throw new \ReflectionException("method [{$controller}->{$method}()] is parent's!", 404);
             }
-            $view_file = $view_dir.str_replace("\\", "/", $className);
-            $view_suffix = $router['view_suffix'];
-            $view_file = strrchr($view_file, ".{$view_suffix}") == ".{$view_suffix}" ? $view_file : "{$view_file}.{$view_suffix}";
             return new Status([
                 "status"        => 200,
                 "message"       => "ok",
@@ -231,7 +233,8 @@ class Router
                 "state"         => Service::CONTROLLER,
                 "controller"    => $controller,
                 "method"        => $method,
-                "view"          => $className
+                "view"          => $className,
+                "path"          => reset($pathArray)
             ]);
         }
     }
