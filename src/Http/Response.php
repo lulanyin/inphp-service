@@ -100,11 +100,12 @@ class Response implements IResponse
         $this->withStatus($status->status);
         $this->path = $status->path;
         $this->status = $status;
+        //站点配置
+        $config = Container::getConfig();
         //内容类型
         $response_content_type = $config['router']['http']['response_content_type'] ?? [];
         $response_type = $response_content_type[$this->path] ?? 'default';
         $this->content_type = $response_type;
-
         $controller = null;
         if($status->status == 200){
             if($status->state == 'options' || $status->state == 'favicon.ico'){
@@ -117,7 +118,6 @@ class Response implements IResponse
             }
         }
         //中间键
-        $config = Container::getConfig();
         $middleware = $config['router']['http']['middleware'] ?? [];
         //控制器执行前处理中间键
         $before_execute_middlewares = $middleware['before_execute'] ?? [];
@@ -198,10 +198,23 @@ class Response implements IResponse
                         $this->withHTML(file_get_contents($file));
                     }
                 }else{
-                    $this->withText();
+                    $this->withContent($this->controller_result);
                 }
             }
         }
+        
+        if($status->status != 200){
+            if($response_type == 'json'){
+                $this->withJson([
+                    'error'     => $status->status,
+                    'status'    => $status->status,
+                    'message'   => $status->message
+                ]);
+            }else{
+                $this->withContent($status->message);
+            }
+        }
+
         //返回本身
         return $this;
     }
@@ -364,10 +377,10 @@ class Response implements IResponse
 
     /**
      * 输出文本
-     * @param $text
+     * @param string $text
      * @return Response
      */
-    public function withText($text){
+    public function withText(string $text){
         return $this->withHeader("Content-Type", "text/plain")->withContent($text);
     }
 

@@ -175,13 +175,15 @@ class Router
                 $controller = $c1 = $router_prefix.join("\\", $pathArray);
                 if(!class_exists($controller)){
                     //匹配 /admin/user/list -> /admin/user/list/index->index();
-                    $controller = $c2 = $router_prefix.join("\\", $pathArray)."\index";
+                    $pathArray = array_merge($pathArray, ['index']);
+                    $controller = $c2 = $router_prefix.join("\\", $pathArray);
                     if(!class_exists($controller)){
-                        //匹配 /admin/user/list -> /admin/user/index->list();
-                        $method = $pathLen<=2 ? $pathArray[count($pathArray)-2] : end($pathArray);
-                        $pathArray = array_merge(array_slice($pathArray, 0, $pathLen<=2 ? -2 : -1), ["index"]);
-                        $className = $c3 = $router_prefix.join("\\", $pathArray);
-                        if(!class_exists($className)) {
+                        //匹配 /admin/user/list -> /admin/user/index->list(); 根据上边原始地址的 pathLen 来判断
+                        //或者 /admin/list -> /admin/index->list()
+                        $method = $pathLen <= 2 ? $pathArray[count($pathArray) - 3] : $pathArray[count($pathArray) - 2];
+                        $pathArray = array_merge(array_slice($pathArray, 0, $pathLen<=2 ? -3 : -2), ["index"]);
+                        $controller = $c3 = $router_prefix.join("\\", $pathArray);
+                        if(!class_exists($controller)) {
                             //找不到，啥也找不到
                             return new Status([
                                 "status"        => 404,
@@ -200,9 +202,7 @@ class Router
             $method = end($pathArray);
             $pathArray = array_slice($pathArray, 0, -1);
         }
-        $view_file_name = str_replace("\\", "/", $className);
-        $view_file_path_array = array_slice(explode("/", $view_file_name), 1);
-        $view_file = join("/", $view_file_path_array);
+        $view_file = join("/", array_slice($pathArray, 1));
         $view_file = strrchr($view_file, ".{$view_suffix}") == ".{$view_suffix}" ? $view_file : "{$view_file}.{$view_suffix}";
         //进行类判断，使用反射方法
         try {
