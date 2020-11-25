@@ -23,9 +23,12 @@ class Session
                 switch($session_set['driver']){
                     case "middleware":
                         //使用中间键处理
-                        if($session_set['middleware']["get"] instanceof ISessionMiddleWare){
-                            $middleware = new $session_set['middleware']["get"]($php_session_id);
-                            return $middleware->get($name, $default);
+                        $smName = $session_set['middleware']["get"];
+                        if(!empty($smName) && class_exists($smName)){
+                            $sm = new $smName($php_session_id);
+                            if($sm instanceof ISessionMiddleWare){
+                                return $sm->get($name, $default);
+                            }
                         }
                         break;
                     default :
@@ -77,9 +80,12 @@ class Session
             switch($session_set['driver']){
                 case "middleware":
                     //使用中间键处理
-                    if($session_set['middleware']["set"] instanceof ISessionMiddleWare){
-                        $middleware = new $session_set['middleware']["set"]($php_session_id);
-                        return $middleware->set($name, $value);
+                    $smName = $session_set['middleware']["set"];
+                    if(!empty($smName) && class_exists($smName)){
+                        $sm = new $smName($php_session_id);
+                        if($sm instanceof ISessionMiddleWare){
+                            $sm->set($name, $value);
+                        }
                     }
                     break;
                 default :
@@ -130,9 +136,12 @@ class Session
                 switch($session_set['driver']){
                     case "middleware":
                         //使用中间键处理
-                        if($session_set['middleware']["drop"] instanceof ISessionMiddleWare){
-                            $middleware = new $session_set['middleware']["drop"]($php_session_id);
-                            return $middleware->drop($name);
+                        $smName = $session_set['middleware']["drop"];
+                        if(!empty($smName) && class_exists($smName)){
+                            $sm = new $smName($php_session_id);
+                            if($sm instanceof ISessionMiddleWare){
+                                $sm->drop($name);
+                            }
                         }
                         break;
                     default :

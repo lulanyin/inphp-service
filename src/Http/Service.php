@@ -1,7 +1,9 @@
 <?php
 namespace Inphp\Service\Http;
 
+use Inphp\Service\IMiddleWare;
 use Inphp\Service\IService;
+use Inphp\Service\IWorkerStartMiddleWare;
 use Inphp\Service\Object\Client;
 use Inphp\Service\Util\File;
 use Swoole\Http\Server;
@@ -86,7 +88,7 @@ class Service implements IService
             $this->server_setting = $config['swoole']['http']['settings'] ?? $this->server_setting;
             $this->http_server = new Server($this->ip, $this->port);
             $this->http_server->set($this->server_setting);
-            //
+            //on request
             $this->http_server->on("request", function (\Swoole\Http\Request $swoole_request, \Swoole\Http\Response $swoole_response) use($config){
                 //保存
                 Container::setRequest($swoole_request);
@@ -121,17 +123,34 @@ class Service implements IService
                 // session 需要在之后设置
                 Container::updateClient("session", Session::get());
                 $status = (new Router())->start();
+                //中间键处理
+                $middlewares = $config['router']['http']['middleware'] ?? [];
+                $middlewares = $middlewares['on_request'] ?? [];
+                foreach ($middlewares as $middleware){
+                    $m = new $middleware();
+                    if($m instanceof IMiddleWare){
+                        $m->process($response);
+                    }
+                }
                 //得到路由状态对象，交由 Response 处理，响应数据给客户端
                 $response->start($status)->send();
             });
             //自动重启线程
             $this->autoReloadProcessor = new Process([$this, "reload"]);
             $this->http_server->addProcess($this->autoReloadProcessor);
-            $this->http_server->on("WorkerStart", function (Server $server, int $worker_id){
+            $this->http_server->on("WorkerStart", function (Server $server, int $worker_id) use($config){
                 if($worker_id == 0){
                     $ip = $this->ip == '0.0.0.0' ? '127.0.0.1' : $this->ip;
                     echo "主进程已启动，web服务地址是：http://{$ip}:{$this->port}".PHP_EOL;
                     $this->autoReload($server);
+                }
+                $middlewares = $config['swoole']['http']['middleware'] ?? [];
+                $middlewares = $middlewares['onWorkerStart'] ?? [];
+                foreach ($middlewares as $middleware){
+                    $m = new $middleware();
+                    if($m instanceof IWorkerStartMiddleWare){
+                        $m->process($server, $worker_id);
+                    }
                 }
             });
         }else{
