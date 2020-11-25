@@ -120,6 +120,19 @@ return [
 ];
 
 /**
- * 默认请求使用的是  上方配置中的 {router.http.home}/{router.http.default}/index/index -> {router.http.home}/{router.http.default}/index->index();
+ * 默认请求使用的是上方配置中的：{router.http.home}/{router.http.default}/index/index
+ * 会执行：{router.http.home}/{router.http.default}/index->index();
+ * 判断的逻辑：
+ * 1. 优先使用命名空间入口，进入PHP处理
+ * /list : /list->index()    /user/list : /user->list()
+ * 2. 如果根据请求路径，未找到入口，则使用首页的入口，同时，根据请求路径，查看是否存在对应的静态文件
+ * 如果存在，则展示此静态文件，其实直接识别静态文件，是存在风险的，所以请勿在静态文件上留下有风险的代码，默认按内容显示，不执行PHP代码。
+ * /list : /list.html  /user/list : /user/list.html
+ * 3. 上方2个方式都未找到匹配，则进入智能匹配：
+ * /list : /index->list()  /user/list : user/index->list()
+ * 4. 都找不到，则会返回 404 状态码
+ * ---------------
+ * 如果匹配域名，则路径会是 /{匹配的域名入口}/{请求路径}  :  api.xxx.com/user/list 识别为  /api/user/list
+ * 如果未匹配域名，则路径是 /{请求路径} : www.xxx.com/api/user/list 识别为 /api/user/list， www.xxx.com/news/list 识别为 /web/news/list
  */
 ```
