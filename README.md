@@ -118,8 +118,8 @@ return [
         ]
     ]
 ];
+
+/**
+ * 默认请求使用的是  上方配置中的 {router.http.home}/{router.http.default}/index/index -> {router.http.home}/{router.http.default}/index->index();
+ */
 ```
-
-#### Http
-
-#### WebSocket
