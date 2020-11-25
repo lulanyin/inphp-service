@@ -59,13 +59,25 @@ class Response implements IResponse
      * 控制器的路径
      * @var string
      */
-    private $path = '';
+    public $path = '';
 
     /**
      * 是否已发送过响应
      * @var bool 
      */
-    private $hasSend = false;
+    public $hasSend = false;
+
+    /**
+     * 控制器执行后，返回的数据
+     * @var null
+     */
+    public $controller_result = null;
+
+    /**
+     * 响应内容类型，仅支持 json 或 默认
+     * @var string
+     */
+    public $content_type = 'default';
 
     /**
      * 初始化
@@ -88,6 +100,10 @@ class Response implements IResponse
         $this->withStatus($status->status);
         $this->path = $status->path;
         $this->status = $status;
+        //内容类型
+        $response_content_type = $config['router']['http']['response_content_type'] ?? [];
+        $response_type = $response_content_type[$this->path] ?? 'default';
+        $this->content_type = $response_type;
 
         $controller = null;
         if($status->status == 200){
@@ -100,7 +116,6 @@ class Response implements IResponse
                 $controller = new $controllerName();
             }
         }
-
         //中间键
         $config = Container::getConfig();
         $middleware = $config['router']['http']['middleware'] ?? [];
@@ -109,8 +124,9 @@ class Response implements IResponse
         $before_execute_middlewares = is_string($before_execute_middlewares) ? [$before_execute_middlewares] : (is_array($before_execute_middlewares) ? $before_execute_middlewares : []);
         if(!empty($before_execute_middlewares)){
             foreach ($before_execute_middlewares as $before_execute_middleware){
-                if($before_execute_middleware instanceof IMiddleWare){
-                    $before_execute_middleware::process($this, $controller, $status->method);
+                $bem = new $before_execute_middleware();
+                if($bem instanceof IMiddleWare){
+                    $bem->process($this, $controller, $status->method);
                 }
             }
         }
@@ -120,10 +136,18 @@ class Response implements IResponse
                 $result = $controller->{$status->method}();
                 if($result instanceof Response){
                     //$result->send();
-                }elseif (is_string($result)){
-                    $this->withAddHeader("Content-Type", "text/plain")->withContent($result);
-                }elseif(is_object($result) || is_array($result)){
-                    $this->withJson($result);
+                }elseif (is_string($result) || is_object($result) || is_array($result)){
+                    //控制器有数据返回
+                    if($response_type == 'json'){
+                        $this->withJson([
+                            "error"     => 0,
+                            "message"   => 'success',
+                            "data"      => $result
+                        ]);
+                    }else{
+                        //将数据保存在全局中
+                        $this->controller_result = $result;
+                    }
                 }elseif(!empty($this->content)){
                     //已经设置有内容
                     //$this->send();
@@ -138,26 +162,44 @@ class Response implements IResponse
         $before_send_middlewares = is_string($before_send_middlewares) ? [$before_send_middlewares] : (is_array($before_send_middlewares) ? $before_send_middlewares : []);
         if(!empty($before_send_middlewares)){
             foreach ($before_send_middlewares as $before_send_middleware){
-                if($before_send_middleware instanceof IMiddleWare){
-                    $before_send_middleware::process($this, $controller, $status->method);
+                $bsm = new $before_send_middleware();
+                if($bsm instanceof IMiddleWare){
+                    $bsm->process($this, $controller, $status->method);
                 }
             }
         }
 
         //可以使用中间键完成模板渲染，如果都未处理，则默认使用PHP去处理视图文件
         $view_dir = $config['router']['http']['view'];
-        if(empty($this->content) && file_exists($view_dir.$this->path."/".$status->view) && $status->status == 200){
-            //还未设置响应内容，默认展示模板
-            $view_php = $config['router']['http']['view_php'] ?? false;
-            if($view_php){
-                //允许执行PHP
-                ob_start();
-                include $view_dir.$this->path."/".$status->view;
-                $this->withHTML(ob_get_contents());
-                ob_clean();
+        if(empty($this->content) && $status->status == 200){
+            if($response_type == 'json'){
+                //使用json数据响应
+                $this->withJson([
+                    "error"     => 0,
+                    "status"    => 200,
+                    "message"   => 'success',
+                    "data"      => $this->controller_result
+                ]);
             }else{
-                //不执行PHP，按文件内容展示
-                $this->withHTML(file_get_contents($view_dir.$this->path."/".$status->view));
+                //常规内容响应
+                $file = $view_dir.$this->path."/".$status->view;
+                $file = str_replace("//", "/", $file);
+                if(file_exists($file)){
+                    //还未设置响应内容，默认展示模板
+                    $view_php = $config['router']['http']['view_php'] ?? false;
+                    if($view_php){
+                        //允许执行PHP
+                        ob_start();
+                        include $file;
+                        $this->withHTML(ob_get_contents());
+                        ob_clean();
+                    }else{
+                        //不执行PHP，按文件内容展示
+                        $this->withHTML(file_get_contents($file));
+                    }
+                }else{
+                    $this->withText();
+                }
             }
         }
         //返回本身

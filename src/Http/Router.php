@@ -140,13 +140,22 @@ class Router
         //入口前置
         $router_prefix = $router['home'];
         $view_dir = $router['view'];
+        $view_suffix = $router['view_suffix'];
         //筛选控制器，末尾的是 class的method，需要截断
         $className =  join("\\", array_slice($pathArray, 0, -1));
         $controller = $router_prefix.$className;
         if(!class_exists($controller)){
             //不存在，则查看静态文件是否存在，静态文件直接使用全路径匹配，不需要截断
-            $html_file = $view_dir.join("/", $pathArray);
-            if(file_exists($html_file)){
+            //别根目录静态文件需要特别处理，因为根目录的文件路径会是  /web/xxx.html/index -> /web/xxx.html/index.html  会处理为两条路径
+            $html_file_one = join("/", $pathArray);
+            $html_file_one = strrchr($html_file_one, ".{$view_suffix}") == ".{$view_suffix}" ? $html_file_one : "{$html_file_one}.{$view_suffix}";
+            $html_file_two = null;
+            if(count($pathArray) == 3){
+                $html_file_two = join("/", array_slice($pathArray, 0, -1));
+                $html_file_two = strrchr($html_file_two, ".{$view_suffix}") == ".{$view_suffix}" ? $html_file_two : "{$html_file_two}.{$view_suffix}";
+            }
+            // 判断两条路径 /web/xxx/xxx.html   /web/xxx.html
+            if(file_exists($view_dir.$html_file_one) || (!is_null($html_file_two) && file_exists($view_dir.$html_file_two))){
                 $className = join("\\", [reset($pathArray), "index"]);
                 $controller = $router_prefix.$className;
                 //找到静态文件
@@ -156,7 +165,7 @@ class Router
                     "state"         => Service::HTML,
                     "controller"    => class_exists($controller) ? $controller : null,
                     "method"        => "index",
-                    "view"          => join("/", array_slice($pathArray, 1)),
+                    "view"          => substr(file_exists($view_dir.$html_file_one) ? $html_file_one : $html_file_two, strlen(reset($pathArray))),
                     "path"          => reset($pathArray)
                 ]);
             }else{
@@ -194,7 +203,6 @@ class Router
         $view_file_name = str_replace("\\", "/", $className);
         $view_file_path_array = array_slice(explode("/", $view_file_name), 1);
         $view_file = join("/", $view_file_path_array);
-        $view_suffix = $router['view_suffix'];
         $view_file = strrchr($view_file, ".{$view_suffix}") == ".{$view_suffix}" ? $view_file : "{$view_file}.{$view_suffix}";
         //进行类判断，使用反射方法
         try {

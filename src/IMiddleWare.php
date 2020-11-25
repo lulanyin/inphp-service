@@ -10,5 +10,5 @@ use Inphp\Service\Http\Response;
  */
 interface IMiddleWare
 {
-    public static function process(Response $response, $controller = null, string $method = null);
+    public function process(Response $response, $controller = null, string $method = null);
 }
