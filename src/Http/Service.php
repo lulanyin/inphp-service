@@ -101,7 +101,7 @@ class Service implements IService
                 $path = $swoole_request->server['path_info'] ?? '';
                 $uri = $swoole_request->server['request_uri'] ?? '';
                 $path = !empty($path) ? $path : $uri;
-                $http_x_requested_with = $swoole_request->header['http_x_requested_with'] ?? null;
+                $http_x_requested_with = $swoole_request->header['x-requested-with'] ?? null;
                 //交给路由处理，由HTTP控制器处理数据返回，得到数据
                 Container::setClient(new Client([
                     "https"     => null,
