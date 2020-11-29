@@ -6,7 +6,6 @@ use Inphp\Service\IService;
 use Inphp\Service\IWorkerStartMiddleWare;
 use Inphp\Service\Object\Client;
 use Inphp\Service\Util\File;
-use Swoole\Http\Server;
 use Swoole\Process;
 
 /**
@@ -17,19 +16,19 @@ use Swoole\Process;
 class Service implements IService
 {
     /**
-     * swoole http server
-     * @var Server
+     * swoole server
+     * @var \Swoole\WebSocket\Server | \Swoole\Http\Server
      */
-    private $http_server;
+    private $server;
 
     /**
-     * swoole http server 绑定的IP
+     * swoole server 绑定的IP
      * @var string
      */
     private $ip = '127.0.0.1';
 
     /**
-     * Swoole http server 的端口
+     * Swoole server 的端口
      * @var int
      */
     private $port = 1990;
@@ -49,7 +48,7 @@ class Service implements IService
         'max_connection'        => 128,
         //
         'daemonize'             => 0,
-        'dispatch_mode'         => 2,
+        'dispatch_mode'         => 3,
         //日志文件，文件夹必须存在
         'log_file'              => ROOT.'/runtime/log/http_service.log',
         //默认异步进程数量
@@ -86,10 +85,11 @@ class Service implements IService
             $this->ip = $config['swoole']['http']['ip'] ?? $this->ip;
             $this->port = $config['swoole']['http']['port'];
             $this->server_setting = $config['swoole']['http']['settings'] ?? $this->server_setting;
-            $this->http_server = new Server($this->ip, $this->port);
-            $this->http_server->set($this->server_setting);
+            $this->server = $config['swoole']['ws'] ? (new \Swoole\WebSocket\Server($this->ip, $this->port)) : (new \Swoole\Http\Server($this->ip, $this->port));
+            $this->server->set($this->server_setting);
+            //on
             //on request
-            $this->http_server->on("request", function (\Swoole\Http\Request $swoole_request, \Swoole\Http\Response $swoole_response) use($config){
+            $this->server->on("request", function (\Swoole\Http\Request $swoole_request, \Swoole\Http\Response $swoole_response) use($config){
                 //保存
                 Container::setRequest($swoole_request);
                 //主域名
@@ -104,7 +104,7 @@ class Service implements IService
                 $http_x_requested_with = $swoole_request->header['x-requested-with'] ?? null;
                 //交给路由处理，由HTTP控制器处理数据返回，得到数据
                 Container::setClient(new Client([
-                    "https"     => null,
+                    "https"     => ($swoole_request->header['X-Request-Scheme'] ?? null) == 'https',
                     "host"      => $host,
                     "ip"        => $ip,
                     "method"    => $method,
@@ -135,10 +135,11 @@ class Service implements IService
                 //得到路由状态对象，交由 Response 处理，响应数据给客户端
                 $response->start($status)->send();
             });
+            //
             //自动重启线程
             $this->autoReloadProcessor = new Process([$this, "reload"]);
-            $this->http_server->addProcess($this->autoReloadProcessor);
-            $this->http_server->on("WorkerStart", function (Server $server, int $worker_id) use($config){
+            $this->server->addProcess($this->autoReloadProcessor);
+            $this->server->on("WorkerStart", function (Server $server, int $worker_id) use($config){
                 if($worker_id == 0){
                     $ip = $this->ip == '0.0.0.0' ? '127.0.0.1' : $this->ip;
                     echo "主进程已启动，web服务地址是：http://{$ip}:{$this->port}".PHP_EOL;
@@ -159,6 +160,10 @@ class Service implements IService
         }
     }
 
+    public function onRequest($request, $response){
+
+    }
+
     /**
      * 服务启动
      */
@@ -166,7 +171,7 @@ class Service implements IService
     {
         // TODO: Implement start() method.
         if(SERVICE_PROVIDER == SWOOLE){
-            $this->http_server->start();
+            $this->server->start();
         }else{
             //session 开启
             if(session_status() !== PHP_SESSION_ACTIVE){
@@ -211,9 +216,9 @@ class Service implements IService
 
     /**
      * 自动重启，每5秒运行一次
-     * @param Server $server
+     * @param $server
      */
-    public function autoReload(Server $server){
+    public function autoReload($server){
         $config = Container::getConfig();
         if($this->autoReloadProcessor && $config['swoole']['http']['auto_reload']){
             $this->autoReloadProcessor->write("start");
@@ -252,7 +257,7 @@ class Service implements IService
                     //apc_clear_cache();
                     @opcache_reset();
                     @file_put_contents($version, json_encode($list));
-                    $this->http_server->reload();
+                    $this->server->reload();
                 }
             }else{
                 @file_put_contents($version, json_encode($list, JSON_UNESCAPED_UNICODE));

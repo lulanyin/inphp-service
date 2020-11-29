@@ -1,7 +1,6 @@
 <?php
 namespace Inphp\Service\Http;
 
-use Inphp\Service\IMiddleWare;
 use Inphp\Service\ISessionMiddleWare;
 
 class Session

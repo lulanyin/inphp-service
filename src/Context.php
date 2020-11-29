@@ -1,6 +1,7 @@
 <?php
 namespace Inphp\Service;
 
+use Inphp\Service\Object\Client;
 use Swoole\Coroutine;
 
 class Context
@@ -36,6 +37,22 @@ class Context
         }else{
             self::$contexts[$name] = $value;
         }
+    }
+
+    /**
+     * 从上下文中获取当前的客户端数据
+     * @return Client
+     */
+    public static function getClient(){
+        return self::get('client');
+    }
+
+    /**
+     * 设置当前客户端数据到上下文
+     * @param Client $client
+     */
+    public static function setClient(Client $client){
+        self::setClient($client);
     }
 
     /**

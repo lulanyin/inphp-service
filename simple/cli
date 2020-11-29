@@ -1,9 +1,0 @@
-#!/usr/bin/env php
-<?php
-require "config.php";
-
-//定义服务类型，SWOOLE，必须定义为此值
-define("SERVICE_PROVIDER", SWOOLE);
-
-$service = new \Inphp\Service\Http\Service();
-$service->start();

@@ -3,7 +3,6 @@ namespace Inphp\Service\Http;
 
 use Inphp\Service\IMiddleWare;
 use Inphp\Service\IResponse;
-use Inphp\Service\Object\Cookie;
 use Inphp\Service\Object\Status;
 
 class Response implements IResponse
@@ -15,7 +14,7 @@ class Response implements IResponse
 
     /**
      * cookies
-     * @var Cookie[]
+     * @var array
      */
     public $cookies = [];
 

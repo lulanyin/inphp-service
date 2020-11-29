@@ -9,6 +9,21 @@ namespace Inphp\Service\Object;
 class Client
 {
     /**
+     * 客户端ID
+     * 可以使用 swoole request 对象的 fd
+     * 也可以自定义
+     * @var int
+     */
+    public $id = -1;
+
+    /**
+     * PHP_SESSION_ID
+     * 若使用的是swoole服务，则需要另行实现
+     * @var string
+     */
+    public $php_session_id = null;
+
+    /**
      * 请求域名
      * @var string
      */
@@ -106,5 +121,25 @@ class Client
         $this->uri      = $values['uri'] ?? '';
         $this->ajax     = $values['ajax'] == true;
         $this->https    = $values['https'] == true;
+        $this->id       = $values['id'] ?? -1;
+        $this->php_session_id = $values['php_session_id'] ?? null;
+    }
+
+    /**
+     * 获取属性值
+     * @param $name
+     * @return mixed
+     */
+    public function get($name){
+        return $this->{$name};
+    }
+
+    /**
+     * 设置值
+     * @param $name
+     * @param $value
+     */
+    public function set($name, $value){
+        $this->{$name} = $value;
     }
 }
