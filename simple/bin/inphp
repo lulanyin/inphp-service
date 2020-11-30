@@ -1,3 +1,15 @@
 #!/usr/bin/env php
 <?php
-require_once "./bootstrap.php";
+require_once __DIR__."/bootstrap.php";
+$argv = $_SERVER['argv'] ?? [];
+
+$arg = $argv[1] ?? "http.start";
+$arg = in_array($arg, ["http.start", "ws.start"]) ? $arg : "http.start";
+
+if($arg == 'ws.start'){
+    //启动websocket
+    App::init(true, true)->start();
+}else{
+    //启动http
+    App::init(true)->start();
+}

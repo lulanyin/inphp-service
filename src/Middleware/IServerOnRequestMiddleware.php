@@ -1,6 +1,9 @@
 <?php
 namespace Inphp\Service\Middleware;
 
+use Inphp\Service\Http\Response;
+use Inphp\Service\Http\Server;
+
 /**
  * 客户端请求中间键接口类
  * 这算是 request 的第 1 个中间键，除了 onConnect 或 onOpen
@@ -10,5 +13,5 @@ namespace Inphp\Service\Middleware;
  */
 interface IServerOnRequestMiddleware
 {
-    public function process($server, $request, $response);
+    public function process(Server $server, $request, Response $response);
 }

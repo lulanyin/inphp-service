@@ -1,7 +1,9 @@
 <?php
 namespace Inphp\Service\Http;
 
-use Inphp\Service\ISessionMiddleWare;
+use Inphp\Service\Config;
+use Inphp\Service\Context;
+use Inphp\Service\Middleware\ISessionMiddleware;
 
 class Session
 {
@@ -13,22 +15,16 @@ class Session
      * @return array|mixed|null
      */
     public static function get(string $name = null, $default = null){
-        if(Container::isSwoole()) {
+        if(Context::isSwoole()) {
             $php_session_id = Request::getCookie("PHP_SESSION_ID");
             if(!empty($php_session_id)){
                 //获取
-                $config = Container::getConfig();
-                $session_set = $config['swoole']["http"]["session"];
+                $config = Config::get('http');
+                $session_set = $config["session"];
                 switch($session_set['driver']){
                     case "middleware":
                         //使用中间键处理
-                        $smName = $session_set['middleware']["get"];
-                        if(!empty($smName) && class_exists($smName)){
-                            $sm = new $smName($php_session_id);
-                            if($sm instanceof ISessionMiddleWare){
-                                return $sm->get($name, $default);
-                            }
-                        }
+                        self::processMiddleware('get', $name, $default);
                         break;
                     default :
                         $file_path = $session_set['file_path'];
@@ -67,25 +63,19 @@ class Session
      * @param $value
      */
     public static function set(string $name, $value){
-        if(Container::isSwoole()){
+        if(Context::isSwoole()){
             $php_session_id = Request::getCookie("PHP_SESSION_ID");
             if(empty($php_session_id)){
                 $php_session_id = sha1(microtime(true).rand(0,999999));
                 Request::setCookie("PHP_SESSION_ID", $php_session_id);
             }
             //
-            $config = Container::getConfig();
-            $session_set = $config['swoole']["http"]["session"];
+            $config = Config::get('http');
+            $session_set = $config["session"];
             switch($session_set['driver']){
                 case "middleware":
                     //使用中间键处理
-                    $smName = $session_set['middleware']["set"];
-                    if(!empty($smName) && class_exists($smName)){
-                        $sm = new $smName($php_session_id);
-                        if($sm instanceof ISessionMiddleWare){
-                            $sm->set($name, $value);
-                        }
-                    }
+                    self::processMiddleware('set', $name, $value);
                     break;
                 default :
                     $file_path = $session_set['file_path'];
@@ -127,21 +117,15 @@ class Session
      * @param string|null $name
      */
     public static function drop(string $name = null){
-        if(Container::isSwoole()) {
+        if(Context::isSwoole()) {
             $php_session_id = Request::getCookie("PHP_SESSION_ID");
             if(!empty($php_session_id)){
-                $config = Container::getConfig();
-                $session_set = $config['swoole']["http"]["session"];
+                $config = Config::get('http');
+                $session_set = $config["session"];
                 switch($session_set['driver']){
                     case "middleware":
                         //使用中间键处理
-                        $smName = $session_set['middleware']["drop"];
-                        if(!empty($smName) && class_exists($smName)){
-                            $sm = new $smName($php_session_id);
-                            if($sm instanceof ISessionMiddleWare){
-                                $sm->drop($name);
-                            }
-                        }
+                        self::processMiddleware('drop', $name);
                         break;
                     default :
                         $file_path = $session_set['file_path'];
@@ -173,6 +157,29 @@ class Session
                 $_SESSION = [];
             }else{
                 if(isset($_SESSION[$name])) unset($_SESSION[$name]);
+            }
+        }
+    }
+
+    private static function processMiddleware($method, $name, $value = null){
+        $middlewares = Config::get('http.session.middleware');
+        $middlewares = is_array($middlewares) ? $middlewares : [];
+        $middleware = $middlewares[$method] ?? null;
+        if(!is_null($middleware)){
+            if(is_array($middleware)){
+                //[__class__, 'static method']
+                $_class = $middleware[0];
+                $_method = $middleware[1] ?? null;
+                if(class_exists($_class) && !empty($_method)){
+                    call_user_func_array([$_class, $_method], [$name, $value]);
+                }
+            }elseif(is_string($middleware) && class_exists($middleware)){
+                $m = new $middleware();
+                if($m instanceof ISessionMiddleware){
+                    call_user_func_array([$m, $method], [$name, $value]);
+                }
+            }elseif($middleware instanceof \Closure){
+                call_user_func($middleware, [$name, $value]);
             }
         }
     }

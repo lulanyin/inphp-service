@@ -1,10 +1,17 @@
 <?php
 namespace Inphp\Service\Http;
 
-use Inphp\Service\IMiddleWare;
+use Inphp\Service\Config;
+use Inphp\Service\Context;
 use Inphp\Service\IResponse;
+use Inphp\Service\Middleware\IServerOnResponseMiddleware;
 use Inphp\Service\Object\Status;
 
+/**
+ * 响应类
+ * Class Response
+ * @package Inphp\Service\Http
+ */
 class Response implements IResponse
 {
     /**
@@ -100,9 +107,9 @@ class Response implements IResponse
         $this->path = $status->path;
         $this->status = $status;
         //站点配置
-        $config = Container::getConfig();
+        $config = Config::get('http');
         //内容类型
-        $response_content_type = $config['router']['http']['response_content_type'] ?? [];
+        $response_content_type = $config['router']['response_content_type'] ?? [];
         $response_type = $response_content_type[$this->path] ?? 'default';
         $this->content_type = $response_type;
         $controller = null;
@@ -116,20 +123,9 @@ class Response implements IResponse
                 $controller = new $controllerName();
             }
         }
-        //中间键
-        $middleware = $config['router']['http']['middleware'] ?? [];
         //控制器执行前处理中间键
-        $before_execute_middlewares = $middleware['before_execute'] ?? [];
-        $before_execute_middlewares = is_string($before_execute_middlewares) ? [$before_execute_middlewares] : (is_array($before_execute_middlewares) ? $before_execute_middlewares : []);
-        if(!empty($before_execute_middlewares)){
-            foreach ($before_execute_middlewares as $before_execute_middleware){
-                $bem = new $before_execute_middleware();
-                if($bem instanceof IMiddleWare){
-                    $bem->process($this, $controller, $status->method);
-                }
-            }
-        }
-        //响应
+        $this->processMiddleware($controller, $status->method, 'before_execute');
+        //执行
         if(!is_null($controller)){
             if(method_exists($controller, $status->method)){
                 $result = $controller->{$status->method}();
@@ -137,7 +133,7 @@ class Response implements IResponse
                     //$result->send();
                 }elseif (is_string($result) || is_object($result) || is_array($result)){
                     //控制器有数据返回
-                    if($response_type == 'json'){
+                    if(stripos($response_type, 'json') !== false){
                         $this->withJson([
                             "error"     => 0,
                             "message"   => 'success',
@@ -151,27 +147,17 @@ class Response implements IResponse
                     //已经设置有内容
                     //$this->send();
                 }else{
-                    
+                    //其它...
                 }
             }
         }
 
         //发送前处理中间键
-        $before_send_middlewares = $middleware['before_send'] ?? [];
-        $before_send_middlewares = is_string($before_send_middlewares) ? [$before_send_middlewares] : (is_array($before_send_middlewares) ? $before_send_middlewares : []);
-        if(!empty($before_send_middlewares)){
-            foreach ($before_send_middlewares as $before_send_middleware){
-                $bsm = new $before_send_middleware();
-                if($bsm instanceof IMiddleWare){
-                    $bsm->process($this, $controller, $status->method);
-                }
-            }
-        }
+        $this->processMiddleware($controller, $status->method, 'before_send');
 
         //可以使用中间键完成模板渲染，如果都未处理，则默认使用PHP去处理视图文件
-        $view_dir = $config['router']['http']['view'];
         if(empty($this->content) && $status->status == 200){
-            if($response_type == 'json'){
+            if(stripos($response_type, 'json') !== false){
                 //使用json数据响应
                 $this->withJson([
                     "error"     => 0,
@@ -181,11 +167,13 @@ class Response implements IResponse
                 ]);
             }else{
                 //常规内容响应
+                $view_dir = $config['view'];
+                $view_dir = strrchr($view_dir, "/") == "/" ? $view_dir : "{$view_dir}/";
                 $file = $view_dir.$this->path."/".$status->view;
                 $file = str_replace("//", "/", $file);
                 if(file_exists($file)){
                     //还未设置响应内容，默认展示模板
-                    $view_php = $config['router']['http']['view_php'] ?? false;
+                    $view_php = $config['view_php'] ?? false;
                     if($view_php){
                         //允许执行PHP
                         ob_start();
@@ -216,6 +204,41 @@ class Response implements IResponse
 
         //返回本身
         return $this;
+    }
+
+    /**
+     * 执行中间键
+     * @param $controller
+     * @param $method
+     * @param $step
+     */
+    private function processMiddleware($controller, $method, $step){
+        //配置
+        $config = Config::get('http');
+        //中间键
+        $middlewares = $config['middleware'] ?? [];
+        //控制器执行前处理中间键
+        $before_execute_middlewares = $middlewares[$step] ?? [];
+        $before_execute_middlewares = is_string($before_execute_middlewares) ? [$before_execute_middlewares] : (is_array($before_execute_middlewares) ? $before_execute_middlewares : []);
+        if(!empty($before_execute_middlewares)){
+            foreach ($before_execute_middlewares as $before_execute_middleware){
+                if(is_array($before_execute_middleware)){
+                    //[__class__, 'static method']
+                    $_class = $before_execute_middleware[0];
+                    $_method = $before_execute_middleware[1] ?? null;
+                    if(class_exists($_class) && !empty($_method)){
+                        call_user_func_array([$_class, $_method], [$this, $controller, $method]);
+                    }
+                }elseif(is_string($before_execute_middleware) && class_exists($before_execute_middleware)){
+                    $m = new $before_execute_middleware();
+                    if($m instanceof IServerOnResponseMiddleware){
+                        $m->process($this, $controller, $method);
+                    }
+                }elseif($before_execute_middleware instanceof \Closure){
+                    call_user_func($before_execute_middleware, [$this, $controller, $method]);
+                }
+            }
+        }
     }
     
     /**
@@ -293,9 +316,9 @@ class Response implements IResponse
      * 输出cookie
      */
     public function sendCookies(){
-        $config = Container::getConfig();
+        $config = Config::get('http');
         //获取客户端
-        $client = Container::getClient();
+        $client = Context::getClient();
         //跨域共享域名
         $domains = $config['cookie']['domains'] ?? [];
         $domains = is_array($domains) ? $domains : [];
@@ -306,7 +329,7 @@ class Response implements IResponse
             $value = $cookie['value'];
             $time = $cookie['time'];
             //混淆加密字符
-            $key = $config['cookie']['hash_key'] ?? '1a2b3c5g';
+            $key = $config['cookie']['hash_key'] ?? '123456';
             //加密值
             $hash = hash_hmac("sha1", $value, $key);
             //保存位置
@@ -451,14 +474,14 @@ class Response implements IResponse
      * @return bool
      */
     public function accessOriginProcess($path){
-        $config = Container::getConfig();
-        $client = Container::getClient();
+        $config = Config::get('http');
+        $client = Context::getClient();
         $router = $config['router'];
         $host = $client->host;
         $origin = $client->origin ?? $host;
         if($host != $origin){
             //不同的域名，需要判断是否在白名单中，黑名单在HttpWorker已处理，黑名单的IP、域名是进不来这里的
-            $access_origin = $router['http']['access_origin'] ?? [];
+            $access_origin = $router['access_origin'] ?? [];
             if(isset($access_origin[$path])){
                 if(is_array($access_origin[$path])){
                     if(in_array($host, $access_origin[$path])){

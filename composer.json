@@ -25,7 +25,7 @@
   "autoload": {
     "psr-4": {
       "Inphp\\Service\\" : "src/",
-      "Inphp\\ServiceSimple" : "simple/"
+      "Inphp\\ServiceSimple\\" : "simple/"
     }
   },
   "repositories": {

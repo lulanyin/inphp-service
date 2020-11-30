@@ -19,4 +19,4 @@ define("RUNTIME", ROOT."/runtime");
 //app根目录
 define("APP_PATH", ROOT."/app");
 //站点配置
-define("INPHP_SERVICE_CONFIG", ROOT."/config/service.php");
+define("INPHP_SERVICE_CONFIG", __DIR__."/service.php");

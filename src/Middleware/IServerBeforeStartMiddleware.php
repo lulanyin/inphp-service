@@ -8,5 +8,5 @@ namespace Inphp\Service\Middleware;
  */
 interface IServerBeforeStartMiddleware
 {
-    public function process();
+    public function process($server);
 }

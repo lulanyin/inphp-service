@@ -15,7 +15,9 @@ interface IRouterMiddleware
     /**
      * 处理请求路径
      * @param string $uri
-     * @return mixed|Status
+     * @param string|null $method
+     * @param string $group
+     * @return mixed
      */
-    public function process(string $uri = '');
+    public function process(string $uri = '', string $method = null, $group = 'http');
 }

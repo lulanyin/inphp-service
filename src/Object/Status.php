@@ -1,8 +1,6 @@
 <?php
 namespace Inphp\Service\Object;
 
-use Inphp\Service\Http\Service;
-
 /**
  * 路由状态
  * Class Status
@@ -14,7 +12,7 @@ class Status
 
     public $message = "ok";
 
-    public $state = Service::CONTROLLER;
+    public $state = 'controller';
 
     public $controller = null;
 
@@ -24,14 +22,17 @@ class Status
 
     public $path = '';
 
+    public $uri = '';
+
     public function __construct(array $values)
     {
         $this->status       = $values['status'] ?? 200;
         $this->message      = $values['message'] ?? 'ok';
-        $this->state        = $values['state'] ?? Service::CONTROLLER;
+        $this->state        = $values['state'] ?? 'controller';
         $this->controller   = $values['controller'] ?? null;
         $this->method       = $values['method'] ?? 'index';
         $this->view         = $values['view'] ?? null;
         $this->path         = $values['path'] ?? null;
+        $this->uri          = $values['uri'] ?? null;
     }
 }

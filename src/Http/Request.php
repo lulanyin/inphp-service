@@ -1,6 +1,9 @@
 <?php
 namespace Inphp\Service\Http;
 
+use Inphp\Service\Config;
+use Inphp\Service\Context;
+
 class Request
 {
     /**
@@ -12,7 +15,7 @@ class Request
     public static function get(string $name, $default = null)
     {
         // TODO: Implement get() method.
-        $client = Container::getClient();
+        $client = Context::getClient();
         $client->get = $client->get ?? [];
         $client->get[$name] = $client->get[$name] ?? $default;
         return $client->get[$name];
@@ -27,7 +30,7 @@ class Request
     public static function post(string $name, $default = null)
     {
         // TODO: Implement post() method.
-        $client = Container::getClient();
+        $client = Context::getClient();
         $client->post = $client->post ?? [];
         $client->post[$name] = $client->post[$name] ?? $default;
         return $client->post[$name];
@@ -52,15 +55,15 @@ class Request
      * @return string|null
      */
     public static function getCookie(string $name, $default = null){
-        $client = Container::getClient();
+        $client = Context::getClient();
         $client->cookie = $client->cookie ?? [];
         if(!isset($client->cookie[$name]) || !isset($client->cookie[$name."_hash"])){
             return $default;
         }
         $value = $client->cookie[$name];
         $hash = $client->cookie[$name."_hash"];
-        $config = Container::getConfig();
-        $key = $config['cookie']['hash_key'] ?? '1a2b3c5g';
+        $config = Config::get('http');
+        $key = $config['cookie']['hash_key'] ?? '123456';
         if(hash_hmac("sha1", $value, $key) == $hash){
             return $value;
         }
@@ -75,7 +78,7 @@ class Request
      */
     public static function setCookie(string $name, string $value, $time = 3600){
         //获取对象
-        $response = Container::getResponse();
+        $response = Context::getResponse();
         $response->withCookie($name, $value, $time);
     }
 
@@ -86,5 +89,4 @@ class Request
     public static function dropCookie(string $name){
         self::setCookie($name, null, -1);
     }
-
 }
