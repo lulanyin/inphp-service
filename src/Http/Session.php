@@ -33,7 +33,7 @@ class Session
                         self::processMiddleware('get', $name, $default);
                         break;
                     default :
-                        $file_path = $session_set['file_path'];
+                        $file_path = $session_set['path'];
                         //从缓存中取
                         $data = Cache::get($php_session_id, $default, $file_path);
                         $data = !empty($data) ? (@json_decode($data, true) ?? $data) : null;
@@ -81,7 +81,7 @@ class Session
                     self::processMiddleware('set', $name, $value);
                     break;
                 default :
-                    $file_path = $session_set['file_path'];
+                    $file_path = $session_set['path'];
                     //从缓存中取
                     $data = Cache::get($php_session_id, null, $file_path);
                     $data = !empty($data) ? (@json_decode($data, true) ?? $data) : [];
@@ -117,7 +117,7 @@ class Session
                         self::processMiddleware('remove', $name);
                         break;
                     default :
-                        $file_path = $session_set['file_path'];
+                        $file_path = $session_set['path'];
                         //从缓存中取
                         $data = Cache::get($php_session_id, null, $file_path);
                         $data = !empty($data) ? (@json_decode($data, true) ?? $data) : [];

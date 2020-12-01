@@ -98,7 +98,7 @@ class Context
      */
     public static function getClientId(){
         if(self::isSwoole()){
-            $client_id = Coroutine::getContext()['client_id'];
+            $client_id = Coroutine::getContext()['client_id'] ?? 0;
             $client_id = is_numeric($client_id) && $client_id > 0 ? $client_id : 0;
             return $client_id;
         }
