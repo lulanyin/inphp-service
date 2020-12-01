@@ -1,6 +1,8 @@
 <?php
 namespace Inphp\Service\Middleware;
 
+use Inphp\Service\Http\Response;
+
 /**
  * 路由处理完之后，就到响应类的中间键
  * 这应该算第 2 之后的中间键
@@ -12,5 +14,5 @@ namespace Inphp\Service\Middleware;
  */
 interface IServerOnResponseMiddleware
 {
-    public function process($response, $controller = null, $method = null);
+    public function process(Response $response, $controller = null, $method = null);
 }
