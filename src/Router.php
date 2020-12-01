@@ -51,10 +51,9 @@ class Router
      * @param string $uri
      * @param string $request_method
      * @param string $group
-     * @param int $client_id
      * @return Status
      */
-    public static function process(string $uri = '', string $request_method = 'GET', string $group = Service::HTTP, int $client_id = 0){
+    public static function process(string $uri = '', string $request_method = 'GET', string $group = Service::HTTP){
         //处理...
         $path = $uri;
         //处理地址参数
@@ -72,10 +71,15 @@ class Router
         }
         //过滤完
         $end_uri = $path;
+        //在已设置的路由中找
+        $cache_status = self::get($end_uri, $group);
+        if(!empty($cache_status)){
+            return $cache_status;
+        }
         //中间键
-        $middlewares = Config::get($group.'.middleware.on_router', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
+        $middleware_list = Config::get($group.'.middleware.on_router', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
             $_res = null;
             if(is_array($middleware)){
                 //[__class__, 'static method']
@@ -94,7 +98,7 @@ class Router
             }
             //如果已处理到状态数据，则直接返回，下方不再处理
             if($_res instanceof Status){
-                self::set($end_uri, $_res);
+                self::set($end_uri, $_res, $group);
                 return $_res;
             }
         }
@@ -141,7 +145,7 @@ class Router
          */
 
         $configs = Config::get($group);
-        $client = Context::getClient($client_id);
+        $client = Context::getClient();
 
         //路由配置
         $router = $configs['router'];
@@ -188,9 +192,12 @@ class Router
         }
         //入口前置
         $router_prefix = $configs['home'];
-        $view_dir = $configs['view'];
-        $view_dir = strrchr($view_dir, "/") == "/" ? $view_dir : "{$view_dir}/";
-        $view_suffix = $configs['view_suffix'];
+        $view_suffix = $view_dir = '';
+        if($group == Service::HTTP) {
+            $view_dir = $configs['view'];
+            $view_dir = strrchr($view_dir, "/") == "/" ? $view_dir : "{$view_dir}/";
+            $view_suffix = $configs['view_suffix'];
+        }
         //筛选控制器，末尾的是 class的method，需要截断
         $className =  join("\\", array_slice($pathArray, 0, -1));
         $controller = $router_prefix.$className;

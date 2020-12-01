@@ -69,9 +69,9 @@ abstract class Server
      */
     public function beforeStart(){
         //中间键
-        $middlewares = Config::get($this->server_type.'.middleware.before_start', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
+        $middleware_list = Config::get($this->server_type.'.middleware.before_start', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
             if(is_array($middleware)){
                 //[__class__, 'static method']
                 $_class = $middleware[0];
@@ -94,16 +94,20 @@ abstract class Server
      * @param \Swoole\Http\Server $server
      */
     public function onStart(\Swoole\Http\Server $server){
+        //服务启动，清除遗留缓存
+        if($this->server_type == Service::WS){
+            Cache::clean();
+        }
         $ip = $this->ip == '0.0.0.0' ? '127.0.0.1' : $this->ip;
-        echo "主进程已启动，web服务地址是：http://{$ip}:{$this->port}".PHP_EOL;
+        echo "主进程已启动，服务地址是：{$this->server_type}://{$ip}:{$this->port}".PHP_EOL;
         $config = Config::get($this->server_type);
         if($config['hot_update']['enable'] && $this->hot_update_processor){
             $this->hot_update_processor->write('start');
         }
         //中间键
-        $middlewares = Config::get($this->server_type.'.middleware.on_start', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
+        $middleware_list = Config::get($this->server_type.'.middleware.on_start', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
             if(is_array($middleware)){
                 //[__class__, 'static method']
                 $_class = $middleware[0];
@@ -129,9 +133,9 @@ abstract class Server
      */
     public function onWorkerStart(\Swoole\Http\Server $server, int $worker_id = 0){
         //中间键
-        $middlewares = Config::get($this->server_type.'.middleware.on_worker_start', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
+        $middleware_list = Config::get($this->server_type.'.middleware.on_worker_start', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
             if(is_array($middleware)){
                 //[__class__, 'static method']
                 $_class = $middleware[0];
@@ -159,9 +163,9 @@ abstract class Server
      */
     public function onTask(\Swoole\Http\Server $server, int $task_id, int $worker_id, $data){
         //中间键
-        $middlewares = Config::get($this->server_type.'.middleware.on_task', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
+        $middleware_list = Config::get($this->server_type.'.middleware.on_task', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
             if(is_array($middleware)){
                 //[__class__, 'static method']
                 $_class = $middleware[0];
@@ -188,9 +192,9 @@ abstract class Server
      */
     public function onFinish(\Swoole\Http\Server $server, int $task_id, $data){
         //中间键
-        $middlewares = Config::get($this->server_type.'.middleware.on_finish', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
+        $middleware_list = Config::get($this->server_type.'.middleware.on_finish', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
             if(is_array($middleware)){
                 //[__class__, 'static method']
                 $_class = $middleware[0];

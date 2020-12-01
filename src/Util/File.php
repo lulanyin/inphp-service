@@ -157,4 +157,38 @@ class File{
         return $files;
     }
 
+    /**
+     * 清空某个文件夹
+     * @param string $path
+     * @param bool $delete
+     */
+    public static function clearDir(string $path, $delete = false){
+        if(is_dir($path)){
+            //清除文件
+            $files = scandir($path);
+            if(count($files) > 0){
+                foreach ($files as $file){
+                    if($file != '.' && $file != ".."){
+                        if(is_dir($path."/".$file)){
+                            self::clearDir($path."/".$file, true);
+                        }else{
+                            unlink($path."/".$file);
+                        }
+                    }
+                }
+            }
+            if($delete){
+                rmdir($path);
+            }
+        }
+    }
+
+    /**
+     * 删除某个文件夹
+     * @param string $path
+     */
+    public static function deleteDir(string $path){
+        self::clearDir($path, true);
+    }
+
 }

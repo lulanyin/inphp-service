@@ -119,8 +119,8 @@ class Client
         $this->session  = $values['session'] ?? [];
         $this->raw_post_data  = $values['raw_post_data'] ?? null;
         $this->uri      = $values['uri'] ?? '';
-        $this->ajax     = $values['ajax'] == true;
-        $this->https    = $values['https'] == true;
+        $this->ajax     = $values['ajax'] ?? false;
+        $this->https    = $values['https'] ?? false;
         $this->id       = $values['id'] ?? -1;
         $this->php_session_id = $values['php_session_id'] ?? null;
     }

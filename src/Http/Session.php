@@ -1,10 +1,16 @@
 <?php
 namespace Inphp\Service\Http;
 
+use Inphp\Service\Cache;
 use Inphp\Service\Config;
 use Inphp\Service\Context;
 use Inphp\Service\Middleware\ISessionMiddleware;
 
+/**
+ * HTTP SESSION
+ * Class Session
+ * @package Inphp\Service\Http
+ */
 class Session
 {
 
@@ -28,22 +34,19 @@ class Session
                         break;
                     default :
                         $file_path = $session_set['file_path'];
-                        $file_path = substr($file_path, -1) == '/' ? $file_path : "{$file_path}/";
-                        //保存到文件
-                        $file = $file_path.$php_session_id.".txt";
-                        if(file_exists($file)){
-                            $data = file_get_contents($file);
-                            $data = !empty($data) ? @json_decode($data, true) : [];
-                            if(is_null($name)){
-                                $list = [];
-                                foreach ($data as $key=>$d){
-                                    $list[$key] = $d['value'];
-                                }
-                                return $list;
+                        //从缓存中取
+                        $data = Cache::get($php_session_id, $default, $file_path);
+                        $data = !empty($data) ? (@json_decode($data, true) ?? $data) : null;
+                        $data = is_array($data) ? $data : [];
+                        if(is_null($name)){
+                            $list = [];
+                            foreach ($data as $key=>$d){
+                                $list[$key] = $d['value'];
                             }
-                            $value = $data[$name] ?? [];
-                            return $value['value'] ?? $default;
+                            return $list;
                         }
+                        $value = $data[$name] ?? [];
+                        return $value['value'] ?? $default;
                         break;
                 }
             }
@@ -79,29 +82,15 @@ class Session
                     break;
                 default :
                     $file_path = $session_set['file_path'];
-                    if(!is_dir($file_path)){
-                        @mkdir($file_path, 0777, true);
-                    }
-                    $file_path = substr($file_path, -1) == '/' ? $file_path : "{$file_path}/";
-                    //保存到文件
-                    $file = $file_path.$php_session_id.".txt";
-                    if(file_exists($file)){
-                        $data = file_get_contents($file);
-                        $data = !empty($data) ? @json_decode($data, true) : [];
-                        $data[$name] = [
-                            "value" => $value,
-                            "time"  => time()
-                        ];
-
-                    }else{
-                        $data = [
-                            $name => [
-                                "value"     => $value,
-                                "time"      => time()
-                            ]
-                        ];
-                    }
-                    @file_put_contents($file, json_encode($data, JSON_UNESCAPED_UNICODE));
+                    //从缓存中取
+                    $data = Cache::get($php_session_id, null, $file_path);
+                    $data = !empty($data) ? (@json_decode($data, true) ?? $data) : [];
+                    $data = is_array($data) ? $data : [];
+                    $data[$name] = [
+                        "value" => $value,
+                        "time"  => time()
+                    ];
+                    Cache::set($php_session_id, $data, $file_path);
                     break;
             }
         }else{
@@ -116,7 +105,7 @@ class Session
      * 移除 session
      * @param string|null $name
      */
-    public static function drop(string $name = null){
+    public static function remove(string $name = null){
         if(Context::isSwoole()) {
             $php_session_id = Request::getCookie("PHP_SESSION_ID");
             if(!empty($php_session_id)){
@@ -125,25 +114,22 @@ class Session
                 switch($session_set['driver']){
                     case "middleware":
                         //使用中间键处理
-                        self::processMiddleware('drop', $name);
+                        self::processMiddleware('remove', $name);
                         break;
                     default :
                         $file_path = $session_set['file_path'];
-                        $file_path = substr($file_path, -1) == '/' ? $file_path : "{$file_path}/";
-                        //保存到文件
-                        $file = $file_path.$php_session_id.".txt";
-                        if(file_exists($file)){
-                            $data = file_get_contents($file);
-                            $data = !empty($data) ? @json_decode($data, true) : [];
-                            if(is_null($name)){
-                                @unlink($file);
-                            }elseif(isset($data[$name])){
-                                unset($data[$name]);
-                                if(!empty($data)){
-                                    @file_put_contents($file, json_encode($data, JSON_UNESCAPED_UNICODE));
-                                }else{
-                                    @unlink($file);
-                                }
+                        //从缓存中取
+                        $data = Cache::get($php_session_id, null, $file_path);
+                        $data = !empty($data) ? (@json_decode($data, true) ?? $data) : [];
+                        $data = is_array($data) ? $data : [];
+                        if(is_null($name)){
+                            Cache::remove($php_session_id);
+                        }elseif(isset($data[$name])){
+                            unset($data[$name]);
+                            if(!empty($data)){
+                                Cache::set($php_session_id, $data);
+                            }else{
+                                Cache::remove($php_session_id);
                             }
                         }
                         break;
@@ -161,10 +147,16 @@ class Session
         }
     }
 
+    /**
+     * 统一处理中间键
+     * @param $method
+     * @param $name
+     * @param null $value
+     */
     private static function processMiddleware($method, $name, $value = null){
-        $middlewares = Config::get('http.session.middleware');
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        $middleware = $middlewares[$method] ?? null;
+        $middleware = Config::get('http.session.middleware');
+        $middleware = is_array($middleware) ? $middleware : [];
+        $middleware = $middleware[$method] ?? null;
         if(!is_null($middleware)){
             if(is_array($middleware)){
                 //[__class__, 'static method']

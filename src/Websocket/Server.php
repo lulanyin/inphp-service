@@ -3,14 +3,15 @@ namespace Inphp\Service\Websocket;
 
 use Inphp\Service\Config;
 use Inphp\Service\Context;
-use Inphp\Service\Middleware\IServerOnFinishMiddleware;
+use Inphp\Service\Middleware\IServerOnCloseMiddleware;
 use Inphp\Service\Middleware\IServerOnMessageMiddleware;
+use Inphp\Service\Middleware\IServerOnOpenMiddleware;
 use Inphp\Service\Object\Client;
+use Inphp\Service\Object\Message;
 use Inphp\Service\Router;
 use Inphp\Service\Service;
 use Swoole\Coroutine;
 use Swoole\Http\Request;
-use Swoole\Http\Response;
 use Swoole\Process;
 use Swoole\WebSocket\Frame;
 
@@ -80,7 +81,9 @@ class Server extends \Inphp\Service\Server
      * @param Request $request
      */
     public function onOpen(\Swoole\WebSocket\Server $server, Request $request){
-        //保存客户端数据
+        echo($request->fd." 已连接").PHP_EOL;
+        //保存客户端ID到当前协程
+        Context::setClientId($request->fd);
         //主域名
         $host = $request->header['host'];
         $ip = $swoole_request->header['x-real-ip'] ?? ($request->server['remote_addr'] ?? null);
@@ -99,10 +102,31 @@ class Server extends \Inphp\Service\Server
             "files"     => $request->files,
             "raw_post_data" => $request->rawContent(),
             "uri"       => $path,
-            "origin"    => $request->header['origin'] ?? ''
+            "origin"    => $request->header['origin'] ?? '',
+            "id"        => $request->fd
         ]);
-        //将客户端保存
-        echo $request->fd." 已连接".PHP_EOL;
+        //
+        Context::setClient($client);
+        //中间键
+        $middleware_list = Config::get('http.middleware.on_open', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
+            if(is_array($middleware)){
+                //[__class__, 'static method']
+                $_class = $middleware[0];
+                $_method = $middleware[1] ?? null;
+                if(class_exists($_class) && !empty($_method)){
+                    call_user_func_array([$_class, $_method], [$server, $request]);
+                }
+            }elseif(is_string($middleware) && class_exists($middleware)){
+                $m = new $middleware();
+                if($m instanceof IServerOnOpenMiddleware){
+                    $m->process($server, $request);
+                }
+            }elseif($middleware instanceof \Closure){
+                call_user_func($middleware, [$server, $request]);
+            }
+        }
     }
 
     /**
@@ -112,7 +136,29 @@ class Server extends \Inphp\Service\Server
      * @param int $reactor_id
      */
     public function onClose(\Swoole\WebSocket\Server $server, int $fd, int $reactor_id){
+        Context::setClientId($fd);
+        //中间键
+        $middleware_list = Config::get($this->server_type.'.middleware.on_close', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
+            if(is_array($middleware)){
+                //[__class__, 'static method']
+                $_class = $middleware[0];
+                $_method = $middleware[1] ?? null;
+                if(class_exists($_class) && !empty($_method)){
+                    call_user_func_array([$_class, $_method], [$server, $fd, $reactor_id]);
+                }
+            }elseif(is_string($middleware) && class_exists($middleware)){
+                $m = new $middleware();
+                if($m instanceof IServerOnCloseMiddleware){
+                    $m->process($server, $fd, $reactor_id);
+                }
+            }elseif($middleware instanceof \Closure){
+                call_user_func($middleware, [$server, $fd, $reactor_id]);
+            }
+        }
         echo($fd." 已断开").PHP_EOL;
+        Context::removeClient($fd);
     }
 
     /**
@@ -121,11 +167,15 @@ class Server extends \Inphp\Service\Server
      * @param Frame $frame
      */
     public function onMessage(\Swoole\WebSocket\Server $server, Frame $frame){
+        //保存client_id到当前协程上下文
+        Context::setClientId($frame->fd);
+        //将server对象保存到当前协程上下文
+        Context::setServer($server);
         echo($frame->fd." 发来消息：".$frame->data).PHP_EOL;
         //中间键
-        $middlewares = Config::get('http.middleware.on_request', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
+        $middleware_list = Config::get($this->server_type.'.middleware.on_message', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
             if(is_array($middleware)){
                 //[__class__, 'static method']
                 $_class = $middleware[0];
@@ -144,10 +194,55 @@ class Server extends \Inphp\Service\Server
         }
         //仅允许接收JSON数据格式
         $json = !empty($frame->data) ? @json_decode($frame->data, true) : [];
-        $uri = $json['uri'] ?? '/';
-        $data = $json['data'] ?? null;
-        $status = Router::process($uri, 'upgrade', $this->server_type, $frame->fd);
-        print_r($status);
+        $uri = $json['event'] ?? ($json['uri'] ?? '/');
+        $status = Router::process($uri, 'upgrade', $this->server_type);
+        //保存路由状态到协程上下文
+        Context::setStatus($status);
+        //得到状太，执行控制器
+        if($status->status == 200){
+            if(!empty($status->controller) && class_exists($status->controller)){
+                //仅处理能找到控制器的，其它数据一致不处理
+                $controller = new $status->controller();
+                //中间键
+                $this->processMiddleware($server, $frame, 'before_execute');
+                if(method_exists($controller, $status->method)){
+                    $message = new Message($json);
+                    call_user_func_array([$controller, $status->method], [$server, $frame, $message]);
+                    return;
+                }
+            }
+        }
+        //未知数据
+        $this->processMiddleware($server, $frame, 'unknow_data');
+    }
+
+    /**
+     * 未知数据处理
+     * @param \Swoole\WebSocket\Server $server
+     * @param Frame $frame
+     * @param string $part
+     */
+    private function processMiddleware(\Swoole\WebSocket\Server $server, Frame $frame, string $part){
+        //中间键
+        $middleware_list = Config::get($this->server_type.'.middleware.'.$part, []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
+            if(is_array($middleware)){
+                //[__class__, 'static method']
+                $_class = $middleware[0];
+                $_method = $middleware[1] ?? null;
+                if(class_exists($_class) && !empty($_method)){
+                    call_user_func_array([$_class, $_method], [$server, $frame]);
+                }
+            }elseif(is_string($middleware) && class_exists($middleware)){
+                $m = new $middleware();
+                if(method_exists($m, 'process')){
+                    $m->process($server, $frame);
+                }
+            }elseif($middleware instanceof \Closure){
+                call_user_func($middleware, [$server, $frame]);
+            }
+        }
     }
 
     /**

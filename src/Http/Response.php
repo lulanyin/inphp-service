@@ -176,10 +176,13 @@ class Response implements IResponse
                     $view_php = $config['view_php'] ?? false;
                     if($view_php){
                         //允许执行PHP
-                        ob_start();
-                        include $file;
-                        $this->withHTML(ob_get_contents());
-                        ob_clean();
+                        (function() use($file){
+                            //隔离
+                            ob_start();
+                            include $file;
+                            $this->withHTML(ob_get_contents());
+                            ob_clean();
+                        })();
                     }else{
                         //不执行PHP，按文件内容展示
                         $this->withHTML(file_get_contents($file));

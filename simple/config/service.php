@@ -131,13 +131,15 @@ return [
         ],
         //session， 该配置仅对 swoole http server 有效，因为swoole无法像PHP-FPM一样使用 $_SESSION
         'session'   => [
-            //所用驱动，默认使用文件系统，如果使用其它，请填写 middleware，并实现它
-            'driver'    => 'file',
+            //所用驱动，默认使用 cache 系统，如果使用其它，请填写 middleware，并实现它
+            'driver'    => 'cache',
+            //保存位置
             'path'      => RUNTIME.'/session',
+            //使用中间键处理
             'middleware'=> [
                 'get'   => null,
                 'set'   => null,
-                'drop'  => null
+                'remove'  => null
             ]
         ]
     ],
@@ -195,9 +197,7 @@ return [
         'middleware'    => [
             //------------------------------ 服务
             //服务启动前
-            'before_start'  => [
-
-            ],
+            'before_start'  => [],
             //服务启动(仅在swoole http server有效)
             'on_start'         => [],
             //子进程启动(仅在swoole http server有效)
@@ -208,23 +208,39 @@ return [
             //关闭
             'on_close'      => [],
             //收到客户端消息
-            'on_message'    => [
-                //直接函数
-                function(){
-                    echo 'fun on_request'.PHP_EOL;
-                }
-            ],
-            //路由处理
+            'on_message'    => [],
+            //事件路由处理
             'on_router'     => [],
+            //------------------------------ 控制器
             //控制器已初始化，但未执行前
             'before_execute'=> [],
-            //向客户端发送消息之前
+            //向客户端发送消息之前（注意，这里指的是执行 $server->send()）
             'before_send'   => [],
             //----------------------------- 异步投递
             //投递异步任务(仅在swoole http server有效)
             'on_task'       => [],
             //异步任务执行完成(仅在swoole http server有效)
-            'on_finish'     => []
+            'on_finish'     => [],
+            //----------------------------- 未知数据
+            'unknow_data'   => []
+        ]
+    ],
+    //客户端临时数据缓存，HTTP，WS共用，http的session默认使用这里
+    'cache'    => [
+        //缓存驱动，默认使用文件
+        'driver'    => 'file',
+        //缓存文件夹
+        'path'      => RUNTIME.'/client',
+        //使用中间键处理
+        'middleware'=> [
+            //获取
+            'get'   => null,
+            //设置
+            'set'   => null,
+            //移除
+            'remove'=> null,
+            //清除所有
+            'clean' => null
         ]
     ]
 ];
