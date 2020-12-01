@@ -219,26 +219,26 @@ class Response implements IResponse
         //配置
         $config = Config::get('http');
         //中间键
-        $middlewares = $config['middleware'] ?? [];
+        $middleware_list = $config['middleware'] ?? [];
         //控制器执行前处理中间键
-        $before_execute_middlewares = $middlewares[$step] ?? [];
-        $before_execute_middlewares = is_string($before_execute_middlewares) ? [$before_execute_middlewares] : (is_array($before_execute_middlewares) ? $before_execute_middlewares : []);
-        if(!empty($before_execute_middlewares)){
-            foreach ($before_execute_middlewares as $before_execute_middleware){
-                if(is_array($before_execute_middleware)){
+        $middleware_list = $middleware_list[$step] ?? [];
+        $middleware_list = is_string($middleware_list) ? [$middleware_list] : (is_array($middleware_list) ? $middleware_list : []);
+        if(!empty($middleware_list)){
+            foreach ($middleware_list as $middleware){
+                if(is_array($middleware)){
                     //[__class__, 'static method']
-                    $_class = $before_execute_middleware[0];
-                    $_method = $before_execute_middleware[1] ?? null;
+                    $_class = $middleware[0];
+                    $_method = $middleware[1] ?? null;
                     if(class_exists($_class) && !empty($_method)){
                         call_user_func_array([$_class, $_method], [$this, $controller, $method]);
                     }
-                }elseif(is_string($before_execute_middleware) && class_exists($before_execute_middleware)){
-                    $m = new $before_execute_middleware();
+                }elseif(is_string($middleware) && class_exists($middleware)){
+                    $m = new $middleware();
                     if($m instanceof IServerOnResponseMiddleware){
                         $m->process($this, $controller, $method);
                     }
-                }elseif($before_execute_middleware instanceof \Closure){
-                    call_user_func($before_execute_middleware, [$this, $controller, $method]);
+                }elseif($middleware instanceof \Closure){
+                    call_user_func($middleware, [$this, $controller, $method]);
                 }
             }
         }

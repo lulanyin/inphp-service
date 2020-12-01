@@ -8,5 +8,8 @@ namespace Inphp\Service\Middleware;
 
 interface ICacheMiddleware
 {
-    public function get($name, $value);
+    public function get(string $name, $default);
+    public function set(string $name, $value);
+    public function remove(string $name);
+    public function clean(string $name);
 }
