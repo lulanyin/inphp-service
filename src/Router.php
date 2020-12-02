@@ -22,26 +22,28 @@ class Router
 
     /**
      * 获取路由
+     * @param $host
      * @param $uri
      * @param string $group
      * @return mixed|null
      */
-    public static function get($uri, $group = Service::HTTP){
+    public static function get($host, $uri, $group = Service::HTTP){
         $uri = '' ? '/' : $uri;
-        $hash = md5($uri);
+        $hash = md5($host.$uri);
         self::$list[$group] = self::$list[$group] ?? [];
         return self::$list[$group][$hash] ?? null;
     }
 
     /**
      * 设置路由
+     * @param $host
      * @param $uri
      * @param $status
      * @param string $group
      */
-    public static function set($uri, $status, $group = Service::HTTP){
+    public static function set($host, $uri, $status, $group = Service::HTTP){
         $uri = '' ? '/' : $uri;
-        $hash = md5($uri);
+        $hash = md5($host.$uri);
         self::$list[$group] = self::$list[$group] ?? [];
         self::$list[$group][$hash] = $status;
     }
@@ -54,6 +56,8 @@ class Router
      * @return Status
      */
     public static function process(string $uri = '', string $request_method = 'GET', string $group = Service::HTTP){
+        //获取客户端数据
+        $client = Context::getClient();
         //处理...
         $path = $uri;
         //处理地址参数
@@ -71,37 +75,7 @@ class Router
         }
         //过滤完
         $end_uri = $path;
-        //在已设置的路由中找
-        $cache_status = self::get($end_uri, $group);
-        if(!empty($cache_status)){
-            return $cache_status;
-        }
-        //中间键
-        $middleware_list = Config::get($group.'.middleware.on_router', []);
-        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
-        foreach ($middleware_list as $middleware){
-            $_res = null;
-            if(is_array($middleware)){
-                //[__class__, 'static method']
-                $_class = $middleware[0];
-                $_method = $middleware[1] ?? null;
-                if(class_exists($_class) && !empty($_method)){
-                    $_res = call_user_func_array([$_class, $_method], [$end_uri, $request_method, $group]);
-                }
-            }elseif(is_string($middleware) && class_exists($middleware)){
-                $m = new $middleware();
-                if($m instanceof IRouterMiddleware){
-                    $_res = $m->process($end_uri, $request_method, $group);
-                }
-            }elseif($middleware instanceof \Closure){
-                $_res = call_user_func($middleware, [$end_uri, $request_method, $group]);
-            }
-            //如果已处理到状态数据，则直接返回，下方不再处理
-            if($_res instanceof Status){
-                self::set($end_uri, $_res, $group);
-                return $_res;
-            }
-        }
+
         //谷歌浏览器的 favicon.ico 请求
         if($path == 'favicon.ico'){
             //
@@ -115,22 +89,54 @@ class Router
                 "uri"           => $end_uri
             ]);
         }
-
-        //OPTIONS请求
-        if($request_method == 'OPTIONS'){
+        //拦截一些请求
+        if($request_method == 'OPTIONS' || $request_method == 'DELETE' || $request_method == 'PUT'){
             return new Status([
                 "status"        => 200,
                 "message"       => "ok",
-                "state"         => 'options',
+                "state"         => $request_method,
                 "controller"    => null,
                 "method"        => null,
                 "view"          => null,
                 "uri"           => $end_uri
             ]);
         }
+        //在已设置的路由中找
+        $cache_status = self::get($client->host, $end_uri, $group);
+        if(!empty($cache_status)){
+            return $cache_status;
+        }
+        //中间键
+        $middleware_list = Config::get($group.'.middleware.on_router', []);
+        $middleware_list = is_array($middleware_list) ? $middleware_list : [];
+        foreach ($middleware_list as $middleware){
+            $_res = null;
+            if(is_array($middleware)){
+                //[__class__, 'static method']
+                $_class = $middleware[0];
+                $_method = $middleware[1] ?? null;
+                if(class_exists($_class) && !empty($_method)){
+                    $_res = call_user_func_array([$_class, $_method], [$client->host, $end_uri, $request_method, $group]);
+                }
+            }elseif(is_string($middleware) && class_exists($middleware)){
+                $m = new $middleware();
+                if($m instanceof IRouterMiddleware){
+                    $_res = $m->process($client->host, $end_uri, $request_method, $group);
+                }
+            }elseif($middleware instanceof \Closure){
+                $_res = call_user_func($middleware, [$client->host, $end_uri, $request_method, $group]);
+            }
+            //如果已处理到状态数据，则直接返回，下方不再处理
+            if($_res instanceof Status){
+                if($_res->status == 200){
+                    self::set($client->host, $end_uri, $_res, $group);
+                }
+                return $_res;
+            }
+        }
 
         /**
-         * 下方判断的逻辑：
+         * 下方判断的逻辑：（可能以后我也不懂我为何要这么写.....）
          * 1. 优先使用命名空间入口，进入PHP处理
          * /list : /list->index()    /user/list : /user->list()
          * 2. (HTTP)如果根据请求路径，未找到入口，则使用首页的入口，同时，根据请求路径，查看是否存在对应的静态文件
@@ -144,8 +150,8 @@ class Router
          * 如果未匹配域名，则路径是 /{请求路径} : www.xxx.com/api/user/list 识别为 /api/user/list， www.xxx.com/news/list 识别为 /web/news/list
          */
 
+        //获取配置
         $configs = Config::get($group);
-        $client = Context::getClient();
 
         //路由配置
         $router = $configs['router'];
@@ -160,8 +166,6 @@ class Router
             $pathArray = !empty($path) ? explode("/", $path) : [
                 "index", "index"
             ];
-            //记录长度，后面智能匹配的时候要使用
-            $pathLen = count($pathArray) + 1;
             //至少为2长度 [class, ...method]
             if(count($pathArray)<2){
                 //使用 index 填充 /class/index : /class->index()
@@ -183,8 +187,6 @@ class Router
             }
             //默认入口替换为正确的入口文件夹
             $pathArray[0] = $router["list"][$pathArray[0]];
-            //记录长度，后面智能匹配的时候要使用
-            $pathLen = count($pathArray);
             //如果长度少于3，则使用 index 填充满
             if(count($pathArray)<3){
                 $pathArray = array_pad($pathArray, 3, "index");
@@ -198,75 +200,118 @@ class Router
             $view_dir = strrchr($view_dir, "/") == "/" ? $view_dir : "{$view_dir}/";
             $view_suffix = $configs['view_suffix'];
         }
-        //筛选控制器，末尾的是 class的method，需要截断
-        $className =  join("\\", array_slice($pathArray, 0, -1));
-        $controller = $router_prefix.$className;
+        //获取响应数据类型
+        $response_content_type = $router['response_content_type'] ?? [];
+        $status = self::match($router_prefix, $pathArray, $response_content_type[reset($pathArray)] ?? null, $view_dir, $view_suffix, $group);
+        $status->uri = $end_uri;
+        //正常状态，保存到缓存
+        if($status->status == 200){
+            self::set($host, $end_uri, $status, $group);
+        }
+        //返回状态
+        return $status;
+    }
+
+
+    /**
+     * 集中处理匹配路由状态数据
+     * @param $home
+     * @param $pathArray
+     * @param string $response_content_type
+     * @param string $view_dir
+     * @param string $view_suffix
+     * @param string $group
+     * @return Status
+     */
+    public static function match($home, $pathArray, $response_content_type = 'default', $view_dir = __DIR__, $view_suffix = 'html', $group = Service::HTTP){
+        //处理末尾字符
+        $home = strrchr($home, "\\") == "\\" ? $home : "{$home}\\";
+        //处理视图后缀
+        $view_suffix = stripos($view_suffix, ".") === 0 ? $view_suffix : ".{$view_suffix}";
+        $view_dir = strrchr($view_dir, "/") == "/" ? $view_dir : "{$view_dir}/";
+        $view_dir = str_replace("//", "/", $view_dir);
+        //默认使用最后一截字符作方法
+        $method = end($pathArray);
+        //截取处理 /api/pro/list -> /api/pro->list();
+        $pathArray = array_slice($pathArray, 0, -1);
+        //组合成类名
+        $className = join("\\", $pathArray);
+        //拼接成完整的类
+        $controller = $c1 = $home.$className;
+        //判断是否存在
         if(!class_exists($controller)){
-            //HTML识别静态文件
-            if($group == Service::HTTP){
-                //不存在，则查看静态文件是否存在，静态文件直接使用全路径匹配，不需要截断
-                //别根目录静态文件需要特别处理，因为根目录的文件路径会是  /web/xxx.html/index -> /web/xxx.html/index.html  会处理为两条路径
-                $html_file_one = join("/", $pathArray);
-                $html_file_one = strrchr($html_file_one, ".{$view_suffix}") == ".{$view_suffix}" ? $html_file_one : "{$html_file_one}.{$view_suffix}";
-                $html_file_two = null;
-                if(count($pathArray) == 3){
-                    $html_file_two = join("/", array_slice($pathArray, 0, -1));
-                    $html_file_two = strrchr($html_file_two, ".{$view_suffix}") == ".{$view_suffix}" ? $html_file_two : "{$html_file_two}.{$view_suffix}";
-                }
-                // 判断两条路径 /web/xxx/xxx.html   /web/xxx.html
-                if(file_exists($view_dir.$html_file_one) || (!is_null($html_file_two) && file_exists($view_dir.$html_file_two))){
-                    $className = join("\\", [reset($pathArray), "index"]);
-                    $controller = $router_prefix.$className;
-                    //找到静态文件
-                    $status = new Status([
-                        "status"        => 200,
-                        "message"       => "ok",
-                        "state"         => 'html',
-                        "controller"    => class_exists($controller) ? $controller : null,
-                        "method"        => "index",
-                        "view"          => substr(file_exists($view_dir.$html_file_one) ? $html_file_one : $html_file_two, strlen(reset($pathArray))),
-                        "path"          => reset($pathArray),
-                        "uri"           => $end_uri
-                    ]);
-                    self::set($end_uri, $status);
-                    return $status;
-                }
-            }
-            //智能匹配
+            //使用全匹配
+            $pathArray[] = $method;
+            //方法默认为 index
             $method = "index";
-            //匹配全路径 /admin/user/list -> /admin/user/list->index();
-            $controller = $c1 = $router_prefix.join("\\", $pathArray);
+            //处理为 /api/pro/list -> /api/pro/list
+            $className = join("\\", $pathArray);
+            $controller = $c2 = $home.$className;
             if(!class_exists($controller)){
-                //匹配 /admin/user/list -> /admin/user/list/index->index();
-                $pathArray = array_merge($pathArray, ['index']);
-                $controller = $c2 = $router_prefix.join("\\", $pathArray);
-                if(!class_exists($controller)){
-                    //匹配 /admin/user/list -> /admin/user/index->list(); 根据上边原始地址的 pathLen 来判断
-                    //或者 /admin/list -> /admin/index->list()
-                    $method = $pathLen <= 2 ? $pathArray[count($pathArray) - 3] : $pathArray[count($pathArray) - 2];
-                    $pathArray = array_merge(array_slice($pathArray, 0, $pathLen<=2 ? -3 : -2), ["index"]);
-                    $controller = $c3 = $router_prefix.join("\\", $pathArray);
-                    if(!class_exists($controller)) {
-                        //找不到，啥也找不到
+                //未找到，优先匹配视图文件（仅HTTP）
+                if($group == Service::HTTP && !stripos($response_content_type, 'json')){
+                    //视图文件
+                    $view_file = join("/", $pathArray);
+                    $view_file = strrchr($view_file, $view_suffix) === $view_suffix ? $view_file : "{$view_file}{$view_suffix}";
+                    $slice = false;
+                    if(!file_exists($view_dir.$view_file)){
+                        $slice = true;
+                        $view_file = join("/", array_slice($pathArray, 0, -1));
+                        $view_file = strrchr($view_file, $view_suffix) === $view_suffix ? $view_file : "{$view_file}{$view_suffix}";
+                    }
+                    if(file_exists($view_dir.$view_file)){
+                        $pathArray = $slice ? array_slice($pathArray, 0, -1) : $pathArray;
+                        //匹配到视图文件
+                        $path = reset($pathArray);
+                        $className = join("\\", [$path, "index"]);
+                        $controller = $home.$className;
                         return new Status([
-                            "status"        => 404,
-                            "message"       => "class [{$c1}, {$c2}, {$c3}] not exists!",
-                            "state"         => 'controller',
-                            "controller"    => null,
-                            "method"        => null,
-                            "view"          => null,
-                            "uri"           => $end_uri
+                            "status"    => 200,
+                            "state"     => 'html',
+                            "controller"=> class_exists($controller) ? $controller : null,
+                            "method"    => class_exists($controller) ? "index" : null,
+                            "view_dir"  => $view_dir.$path,
+                            "path"      => $path,
+                            "view"      => substr($view_file, strlen($path) + 1)
+                        ]);
+                    }
+                }
+                //进行智能匹配
+                //首先匹配：/api/pro/list -> /api/pro/list/index->index();
+                $pathArray[] = "index";
+                //使用默认方法
+                $method = "index";
+                $className = join("\\", $pathArray);
+                $controller = $c3 = $home.$className;
+                if(!class_exists($controller)){
+                    // /api/pro/list/index 恢复为 /api/pro/list
+                    $pathArray = array_slice($pathArray, 0, -1);
+                    if(count($pathArray) == 3 && end($pathArray) == "index"){
+                        //可能是 智路径， 先恢复 如：/web/list 会处理为  /web/list/index， 由于 /web/list 默认已处理过了， 这里可以处理为 /web/index->list()
+                        $method = $pathArray[1];
+                        $pathArray = [$pathArray[0], "index"];
+                    }else{
+                        //取 list 为方法
+                        $method = end($pathArray);
+                        //使用 index
+                        $pathArray[count($pathArray) - 1] = "index";
+                    }
+                    $className = join("\\", $pathArray);
+                    $controller = $c4 = $home.$className;
+                    if(!class_exists($controller)){
+                        //找不到....啥也找不到....
+                        return  new Status([
+                            "status"    => 404,
+                            "message"       => "class [{$c1}, {$c2}, {$c3}, {$c4}] not exists!",
+                            "response_content_type" => $response_content_type
                         ]);
                     }
                 }
             }
-        }else{
-            //找到控制器，取出 method
-            $method = end($pathArray);
-            $pathArray = array_slice($pathArray, 0, -1);
         }
-        //进行类判断，使用反射方法
-        try {
+
+        //若找到了控制器，则进行类判断
+        try{
             //使用反射类，查看方法是否是公共方法，否则也无法使用，如果方法不存在，则也无法使用
             $mr = new \ReflectionMethod($controller, $method);
             $modifierNames = \Reflection::getModifierNames($mr->getModifiers());
@@ -274,48 +319,28 @@ class Router
             if(strtolower($modifierNames[0]) != "public"){
                 throw new \ReflectionException("method [{$controller}->{$method}()] not public!", 404);
             }
-            //反射类，获取该类的方法列表，然后过滤掉继承类的方法，仅可使用自身的公共方法
-            $reflection = new \ReflectionClass($controller);
-            $methodList = $reflection->getMethods();
-            $enableMethodList = [];
-            foreach ($methodList as $item){
-                if($item->class == $controller){
-                    $enableMethodList[] = $item->name;
-                }
-            }
-            if(!in_array($method, $enableMethodList)){
-                throw new \ReflectionException("method [{$controller}->{$method}()] is parent's!", 404);
-            }
-            $view_file = null;
-            if($group == Service::HTTP){
+            if($group == Service::HTTP && !stripos($response_content_type, 'json')){
                 $view_file = join("/", array_slice($pathArray, 1));
-                $view_file = strrchr($view_file, ".{$view_suffix}") == ".{$view_suffix}" ? $view_file : "{$view_file}.{$view_suffix}";
+                $view_file = strrchr($view_file, $view_suffix) === $view_suffix ? $view_file : "{$view_file}{$view_suffix}";
             }
-            $status = new Status([
+            $path = reset($pathArray);
+            return new Status([
                 "status"        => 200,
                 "message"       => "ok",
-                "state"         => 'controller',
+                "state"         => "controller",
                 "controller"    => $controller,
                 "method"        => $method,
-                "view"          => $view_file,
-                "path"          => reset($pathArray),
-                "uri"           => $end_uri
+                "view_dir"      => $view_dir.$path,
+                "path"          => $path,
+                "view"          => $view_file ?? null,
+                "response_content_type" => $response_content_type
             ]);
-            self::set($end_uri, $status);
-            return $status;
-        } catch (\ReflectionException $e) {
-            $status = new Status([
-                "status"        => 404,
-                "message"       => $e->getMessage(),
-                "state"         => 'controller',
-                "controller"    => $controller,
-                "method"        => $method,
-                "view"          => null,
-                "path"          => reset($pathArray),
-                "uri"           => $end_uri
+        }catch (\ReflectionException $exception){
+            return new Status([
+                "status"    => 404,
+                "message"   => $exception->getMessage(),
+                "response_content_type" => $response_content_type
             ]);
-            self::set($end_uri, $status);
-            return $status;
         }
     }
 }

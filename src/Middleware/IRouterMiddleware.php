@@ -2,6 +2,7 @@
 namespace Inphp\Service\Middleware;
 
 use Inphp\Service\Object\Status;
+use Inphp\Service\Service;
 
 /**
  * 执行路由匹配的中间键
@@ -14,10 +15,11 @@ interface IRouterMiddleware
 {
     /**
      * 处理请求路径
+     * @param string $host
      * @param string $uri
      * @param string|null $method
      * @param string $group
-     * @return mixed
+     * @return Status|mixed
      */
-    public function process(string $uri = '', string $method = null, $group = 'http');
+    public function process(string $host, string $uri = '', string $method = null, $group = Service::HTTP);
 }

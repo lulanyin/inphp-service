@@ -109,14 +109,10 @@ class Response implements IResponse
         //站点配置
         $config = Config::get('http');
         //内容类型
-        $response_content_type = $config['router']['response_content_type'] ?? [];
-        $response_type = $response_content_type[$this->path] ?? 'default';
+        $response_type = $status->response_content_type ?? 'default';
         $this->content_type = $response_type;
         $controller = null;
         if($status->status == 200){
-            if($status->state == 'options' || $status->state == 'favicon.ico'){
-                return $this->processOptions();
-            }
             if(!empty($status->controller)){
                 //控制器
                 $controllerName = $status->controller;
@@ -167,7 +163,7 @@ class Response implements IResponse
                 ]);
             }else{
                 //常规内容响应
-                $view_dir = $config['view'];
+                $view_dir = $status->view_dir;
                 $view_dir = strrchr($view_dir, "/") == "/" ? $view_dir : "{$view_dir}/";
                 $file = $view_dir.$this->path."/".$status->view;
                 $file = str_replace("//", "/", $file);
