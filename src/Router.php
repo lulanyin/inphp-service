@@ -1,4 +1,13 @@
 <?php
+// +----------------------------------------------------------------------
+// | INPHP
+// +----------------------------------------------------------------------
+// | Copyright (c) 2020 https://inphp.cc All rights reserved.
+// +----------------------------------------------------------------------
+// | Licensed ( https://opensource.org/licenses/MIT )
+// +----------------------------------------------------------------------
+// | Author: lulanyin <me@lanyin.lu>
+// +----------------------------------------------------------------------
 namespace Inphp\Service;
 
 use Inphp\Service\Middleware\IRouterMiddleware;
@@ -57,7 +66,7 @@ class Router
      */
     public static function process(string $uri = '', string $request_method = 'GET', string $group = Service::HTTP){
         //获取客户端数据
-        $client = Context::getClient();
+        $client = Context::getClient(Context::getClientId());
         //处理...
         $path = $uri;
         //处理地址参数

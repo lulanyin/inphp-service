@@ -1,9 +1,20 @@
 <?php
+// +----------------------------------------------------------------------
+// | INPHP
+// +----------------------------------------------------------------------
+// | Copyright (c) 2020 https://inphp.cc All rights reserved.
+// +----------------------------------------------------------------------
+// | Licensed ( https://opensource.org/licenses/MIT )
+// +----------------------------------------------------------------------
+// | Author: lulanyin <me@lanyin.lu>
+// +----------------------------------------------------------------------
 namespace Inphp\Service;
 
 use Inphp\Service\Object\Client;
+use Inphp\Service\Object\Message;
 use Inphp\Service\Object\Status;
 use Swoole\Coroutine;
+use Swoole\WebSocket\Frame;
 
 class Context
 {
@@ -21,7 +32,6 @@ class Context
      */
     public static function get(string $name, $client_id = 0){
         if(self::isSwoole()){
-            $client_id = $client_id!=0 ? $client_id : self::getClientId();
             if($client_id > 0){
                 //从缓存中读取
                 $cache_key = "client_{$client_id}";
@@ -47,7 +57,6 @@ class Context
      */
     public static function set(string $name, $value, $client_id = 0){
         if(self::isSwoole()){
-            $client_id = $client_id != 0 ? $client_id : self::getClientId();
             if($client_id > 0){
                 //从缓存中读取出来，并修改数据，再重新保存
                 $cache_key = "client_{$client_id}";
@@ -69,7 +78,6 @@ class Context
      * @param int $client_id
      */
     public static function clean($client_id = 0){
-        $client_id = $client_id != 0 ? $client_id : self::getClientId();
         if(self::isSwoole() && $client_id > 0){
             $cache_key = "client_{$client_id}";
             Cache::remove($cache_key);
@@ -140,7 +148,7 @@ class Context
      * @return mixed|null
      */
     public static function getRequest(){
-        return self::get('request', -1);
+        return self::get('request');
     }
 
     /**
@@ -148,7 +156,7 @@ class Context
      * @param $request
      */
     public static function setRequest($request){
-        self::set('request', $request, -1);
+        self::set('request', $request);
     }
 
     /**
@@ -156,7 +164,7 @@ class Context
      * @return mixed|null
      */
     public static function getResponse(){
-        return self::get('response', -1);
+        return self::get('response');
     }
 
     /**
@@ -164,7 +172,7 @@ class Context
      * @param $response
      */
     public static function setResponse($response){
-        self::set('response', $response, -1);
+        self::set('response', $response);
     }
 
     /**
@@ -190,6 +198,50 @@ class Context
             //保存到当前所处理的协程的上下文，方便后续使用
             Coroutine::getContext()['server'] = $server;
         }
+    }
+
+    /**
+     * 设置 Frame 对象（仅websocket）
+     * @param Frame $frame
+     */
+    public static function setFrame(Frame $frame){
+        if(self::isSwoole()){
+            //保存到当前所处理的协程的上下文，方便后续使用
+            Coroutine::getContext()['frame'] = $frame;
+        }
+    }
+
+    /**
+     * 获取 Frame 对象（仅websocket）
+     * @return Frame|null
+     */
+    public static function getFrame(){
+        if(self::isSwoole()){
+            return Coroutine::getContext()['frame'] ?? null;
+        }
+        return null;
+    }
+
+    /**
+     * 设置 Message 对象
+     * @param Message $message
+     */
+    public static function setMessage(Message $message){
+        if(self::isSwoole()){
+            //保存到当前所处理的协程的上下文，方便后续使用
+            Coroutine::getContext()['message'] = $message;
+        }
+    }
+
+    /**
+     * 获取 Message 对象（仅websocket）
+     * @return Frame|null
+     */
+    public static function getMessage(){
+        if(self::isSwoole()){
+            return Coroutine::getContext()['message'] ?? null;
+        }
+        return null;
     }
 
     /**

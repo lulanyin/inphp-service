@@ -1,4 +1,13 @@
 <?php
+// +----------------------------------------------------------------------
+// | INPHP
+// +----------------------------------------------------------------------
+// | Copyright (c) 2020 https://inphp.cc All rights reserved.
+// +----------------------------------------------------------------------
+// | Licensed ( https://opensource.org/licenses/MIT )
+// +----------------------------------------------------------------------
+// | Author: lulanyin <me@lanyin.lu>
+// +----------------------------------------------------------------------
 namespace Inphp\Service\Websocket;
 
 use Inphp\Service\Config;
@@ -81,7 +90,6 @@ class Server extends \Inphp\Service\Server
      * @param Request $request
      */
     public function onOpen(\Swoole\WebSocket\Server $server, Request $request){
-        echo($request->fd." 已连接").PHP_EOL;
         //保存客户端ID到当前协程
         Context::setClientId($request->fd);
         //主域名
@@ -106,7 +114,7 @@ class Server extends \Inphp\Service\Server
             "id"        => $request->fd
         ]);
         //
-        Context::setClient($client);
+        Context::setClient($client, $request->fd);
         //中间键
         $middleware_list = Config::get('http.middleware.on_open', []);
         $middleware_list = is_array($middleware_list) ? $middleware_list : [];
@@ -157,8 +165,8 @@ class Server extends \Inphp\Service\Server
                 call_user_func($middleware, [$server, $fd, $reactor_id]);
             }
         }
-        echo($fd." 已断开").PHP_EOL;
         Context::removeClient($fd);
+        Context::clean($fd);
     }
 
     /**
@@ -171,7 +179,8 @@ class Server extends \Inphp\Service\Server
         Context::setClientId($frame->fd);
         //将server对象保存到当前协程上下文
         Context::setServer($server);
-        echo($frame->fd." 发来消息：".$frame->data).PHP_EOL;
+        //frame 也保存进去
+        Context::setFrame($frame);
         //中间键
         $middleware_list = Config::get($this->server_type.'.middleware.on_message', []);
         $middleware_list = is_array($middleware_list) ? $middleware_list : [];
@@ -194,10 +203,14 @@ class Server extends \Inphp\Service\Server
         }
         //仅允许接收JSON数据格式
         $json = !empty($frame->data) ? @json_decode($frame->data, true) : [];
+        $json = is_array($json) ? $json : ["data" => $frame->data];
         $uri = $json['event'] ?? ($json['uri'] ?? '/');
         $status = Router::process($uri, 'upgrade', $this->server_type);
         //保存路由状态到协程上下文
         Context::setStatus($status);
+        $message = new Message($json);
+        //将消息保存到协程上下文
+        Context::setMessage($message);
         //得到状太，执行控制器
         if($status->status == 200){
             if(!empty($status->controller) && class_exists($status->controller)){
@@ -206,7 +219,6 @@ class Server extends \Inphp\Service\Server
                 //中间键
                 $this->processMiddleware($server, $frame, 'before_execute');
                 if(method_exists($controller, $status->method)){
-                    $message = new Message($json);
                     call_user_func_array([$controller, $status->method], [$server, $frame, $message]);
                     return;
                 }

@@ -1,4 +1,13 @@
 <?php
+// +----------------------------------------------------------------------
+// | INPHP
+// +----------------------------------------------------------------------
+// | Copyright (c) 2020 https://inphp.cc All rights reserved.
+// +----------------------------------------------------------------------
+// | Licensed ( https://opensource.org/licenses/MIT )
+// +----------------------------------------------------------------------
+// | Author: lulanyin <me@lanyin.lu>
+// +----------------------------------------------------------------------
 namespace Inphp\Service;
 
 use Inphp\Service\Middleware\IServerBeforeStartMiddleware;
@@ -53,7 +62,9 @@ abstract class Server
         //最小值为 (worker_num + task_worker_num) * 2 + 32
         'max_connection'=> 1000,
         //数据包分发策略
-        'dispatch_mode' => 2
+        'dispatch_mode' => 2,
+        //守护进程
+        'daemonize' => 0
     ];
 
     /**

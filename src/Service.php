@@ -1,4 +1,13 @@
 <?php
+// +----------------------------------------------------------------------
+// | INPHP
+// +----------------------------------------------------------------------
+// | Copyright (c) 2020 https://inphp.cc All rights reserved.
+// +----------------------------------------------------------------------
+// | Licensed ( https://opensource.org/licenses/MIT )
+// +----------------------------------------------------------------------
+// | Author: lulanyin <me@lanyin.lu>
+// +----------------------------------------------------------------------
 namespace Inphp\Service;
 
 use Inphp\Service\Util\File;
@@ -22,6 +31,14 @@ class Service implements IService
     {
         $ws = $swoole && $ws;
         $this->server = $ws ? new Websocket\Server()  : new Http\Server($swoole);
+        if($swoole){
+            //运行 server 服务，由 Swoole 拓展支持
+            echo "+---------------------+\r\n";
+            echo "| ♪♪♪♪♪♪ INPHP ♪♪♪♪♪♪ |\r\n";
+            echo "| Think you for using |\r\n";
+            echo "|  support by swoole  |\r\n";
+            echo "+---------------------+\r\n";
+        }
     }
 
     public function start()
@@ -62,7 +79,7 @@ class Service implements IService
                 echo date("Y/m/d H:i:s")." server restart ...\r\n";
                 //apc_clear_cache();
                 @opcache_reset();
-                @file_put_contents($version, json_encode($list));
+                @file_put_contents($version, json_encode($list, JSON_UNESCAPED_UNICODE));
                 if($callback instanceof \Closure){
                     $callback();
                 }
