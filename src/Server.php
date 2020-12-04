@@ -110,7 +110,7 @@ abstract class Server
             Cache::clean();
         }
         $ip = $this->ip == '0.0.0.0' ? '127.0.0.1' : $this->ip;
-        echo "主进程已启动，服务地址是：{$this->server_type}://{$ip}:{$this->port}".PHP_EOL;
+        echo "[".($this->server_type == Service::WS ? "websocket" : $this->server_type)."]服务已启动，地址是：{$this->server_type}://{$ip}:{$this->port}".PHP_EOL;
         $config = Config::get($this->server_type);
         if($config['hot_update']['enable'] && $this->hot_update_processor){
             $this->hot_update_processor->write('start');
