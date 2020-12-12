@@ -24,10 +24,7 @@ class Router
      * 保存路由记录
      * @var array
      */
-    public static $list = [
-        'ws'    => [],
-        'http'  => []
-    ];
+    public static $list = [];
 
     /**
      * 获取路由
@@ -36,11 +33,10 @@ class Router
      * @param string $group
      * @return mixed|null
      */
-    public static function get($host, $uri, $group = Service::HTTP){
+    public static function get($host, $uri){
         $uri = '' ? '/' : $uri;
         $hash = md5($host.$uri);
-        self::$list[$group] = self::$list[$group] ?? [];
-        return self::$list[$group][$hash] ?? null;
+        return self::$list[$hash] ?? null;
     }
 
     /**
@@ -50,11 +46,17 @@ class Router
      * @param $status
      * @param string $group
      */
-    public static function set($host, $uri, $status, $group = Service::HTTP){
+    public static function set($host, $uri, $status){
         $uri = '' ? '/' : $uri;
         $hash = md5($host.$uri);
-        self::$list[$group] = self::$list[$group] ?? [];
-        self::$list[$group][$hash] = $status;
+        self::$list[$hash] = $status;
+    }
+
+    /**
+     * 清除缓存
+     */
+    public static function clear(){
+        self::$list = [];
     }
 
     /**
@@ -111,7 +113,7 @@ class Router
             ]);
         }
         //在已设置的路由中找
-        $cache_status = self::get($client->host, $end_uri, $group);
+        $cache_status = self::get($client->host, $end_uri);
         if(!empty($cache_status)){
             return $cache_status;
         }
@@ -138,7 +140,7 @@ class Router
             //如果已处理到状态数据，则直接返回，下方不再处理
             if($_res instanceof Status){
                 if($_res->status == 200){
-                    self::set($client->host, $end_uri, $_res, $group);
+                    self::set($client->host, $end_uri, $_res);
                 }
                 return $_res;
             }
@@ -215,7 +217,7 @@ class Router
         $status->uri = $end_uri;
         //正常状态，保存到缓存
         if($status->status == 200){
-            self::set($host, $end_uri, $status, $group);
+            self::set($host, $end_uri, $status);
         }
         //返回状态
         return $status;
