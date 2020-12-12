@@ -39,26 +39,27 @@ class File{
         if(is_dir($path)){
             //获取此路径下的所有文件
             $preg_match = "/\.(".$match.")$/i";
-            $handle = opendir( $path );
             $files = [];
-            while ( false !== ( $file = readdir( $handle ) ) ){
-                if ( $file != '.' && $file != '..' && $file!="" && $file != '_notes'){
-                    $path2 = $path .DS. $file;//路径
-                    if(!is_dir( $path2 ) ){
-                        if ( preg_match( $preg_match , $file ) ) {
-                            $file = [
-                                "filename"      => $file,
-                                "md5"           => md5_file($path2),
-                                "path"          => $path2,
-                                "suffix"        => stripos($file, ".")>0 ? substr(strchr($file, "."), 1) : null,
-                                "file_size"     => filesize($path2)
-                            ];
-                            $files[] = $file;
+            if($handle = opendir( $path )){
+                while ( false !== ( $file = readdir( $handle ) ) ){
+                    if ( $file != '.' && $file != '..' && $file!="" && $file != '_notes'){
+                        $path2 = $path .DS. $file;//路径
+                        if(!is_dir( $path2 ) ){
+                            if ( preg_match( $preg_match , $file ) ) {
+                                $file = [
+                                    "filename"      => $file,
+                                    "md5"           => md5_file($path2),
+                                    "path"          => $path2,
+                                    "suffix"        => stripos($file, ".")>0 ? substr(strchr($file, "."), 1) : null,
+                                    "file_size"     => filesize($path2)
+                                ];
+                                $files[] = $file;
+                            }
                         }
                     }
                 }
+                @closedir($handle);
             }
-            @closedir($path);
             return $files;
         }
         return [];
@@ -88,7 +89,7 @@ class File{
                     }
                 }
             }
-            @closedir($path);
+            @closedir($handle);
             return $files;
         }
         return [];
