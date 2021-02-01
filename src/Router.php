@@ -105,7 +105,7 @@ class Router
             return new Status([
                 "status"        => 200,
                 "message"       => "ok",
-                "state"         => $request_method,
+                "state"         => strtoupper($request_method),
                 "controller"    => null,
                 "method"        => null,
                 "view"          => null,
@@ -279,8 +279,8 @@ class Router
                         return new Status([
                             "status"    => 200,
                             "state"     => 'html',
-                            "controller"=> class_exists($controller) ? $controller : null,
-                            "method"    => class_exists($controller) ? "index" : null,
+                            "controller"=> null,//class_exists($controller) ? $controller : null,
+                            "method"    => null,//class_exists($controller) ? "index" : null,
                             "view_dir"  => $view_dir.$path,
                             "path"      => $path,
                             "view"      => substr($view_file, strlen($path) + 1)

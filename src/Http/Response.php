@@ -14,6 +14,7 @@ use Inphp\Service\Config;
 use Inphp\Service\Context;
 use Inphp\Service\IResponse;
 use Inphp\Service\Middleware\IServerOnResponseMiddleware;
+use Inphp\Service\Object\Message;
 use Inphp\Service\Object\Status;
 
 /**
@@ -115,6 +116,13 @@ class Response implements IResponse
         $this->withStatus($status->status);
         $this->path = $status->path;
         $this->status = $status;
+        //谷歌浏览器、OPTIONS、PUT、DELETE请求
+        if(in_array($status->state, ['favicon.ico', 'OPTIONS', 'PUT', 'DELETE'])){
+            //跨域options请求，应该需要处理
+            $client = Context::getClient();
+            $this->agreeHost($client->host)->send();
+            return $this;
+        }
         //站点配置
         $config = Config::get('http');
         //内容类型
@@ -130,12 +138,18 @@ class Response implements IResponse
         }
         //控制器执行前处理中间键
         $this->processMiddleware($controller, $status->method, 'before_execute');
+        if($this->hasSend){
+            return $this;
+        }
         //执行
         if(!is_null($controller)){
             if(method_exists($controller, $status->method)){
                 $result = $controller->{$status->method}();
                 if($result instanceof Response){
                     //$result->send();
+                }elseif ($result instanceof Message){
+                    $this->withJson($result->toJson())->send();
+                    return $this;
                 }elseif (is_string($result) || is_object($result) || is_array($result)){
                     //控制器有数据返回
                     if(stripos($response_type, 'json') !== false){
@@ -159,7 +173,9 @@ class Response implements IResponse
 
         //发送前处理中间键
         $this->processMiddleware($controller, $status->method, 'before_send');
-
+        if($this->hasSend){
+            return $this;
+        }
         //可以使用中间键完成模板渲染，如果都未处理，则默认使用PHP去处理视图文件
         if(empty($this->content) && $status->status == 200){
             if(stripos($response_type, 'json') !== false){
@@ -460,6 +476,13 @@ class Response implements IResponse
         }
         $this->end($this->content ?? '');
         $this->hasSend = true;
+        if(Context::isSwoole()){
+            //swoole 服务，不可 exit，退出当前协程？？
+
+        }else{
+            //fast cgi 或 php-fpm 到此结束
+            exit();
+        }
     }
 
     /**
@@ -574,7 +597,6 @@ class Response implements IResponse
         }else{
             $this->withStatus($status);
             $this->withHeader("Location", $uri)->send();
-            exit;
         }
     }
 }

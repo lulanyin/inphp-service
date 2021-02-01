@@ -116,7 +116,7 @@ class Server extends \Inphp\Service\Server
                 "id"        => $request->fd
             ]);
             //将swoole\http\request 保存到上下文
-            Context::set('request', $request);
+            Context::setRequest($request);
         }else{
             //php-fpm/fast-cgi
             //session 开启
@@ -155,31 +155,41 @@ class Server extends \Inphp\Service\Server
         //使用统一对象
         $_response = new Response($response);
         //保存到上下文
-        Context::set('response', $_response);
-        //中间键
-        $middlewares = Config::get('http.middleware.on_request', []);
-        $middlewares = is_array($middlewares) ? $middlewares : [];
-        foreach ($middlewares as $middleware){
-            if(is_array($middleware)){
-                //[__class__, 'static method']
-                $_class = $middleware[0];
-                $_method = $middleware[1] ?? null;
-                if(class_exists($_class) && !empty($_method)){
-                    call_user_func_array([$_class, $_method], [$this, $request, $_response]);
+        Context::setResponse($_response);
+        $exit_status = 0;
+        try{
+            //中间键
+            $middlewares = Config::get('http.middleware.on_request', []);
+            $middlewares = is_array($middlewares) ? $middlewares : [];
+            foreach ($middlewares as $middleware){
+                if(is_array($middleware)){
+                    //[__class__, 'static method']
+                    $_class = $middleware[0];
+                    $_method = $middleware[1] ?? null;
+                    if(class_exists($_class) && !empty($_method)){
+                        call_user_func_array([$_class, $_method], [$this, $request, $_response]);
+                    }
+                }elseif(is_string($middleware) && class_exists($middleware)){
+                    $m = new $middleware();
+                    if($m instanceof IServerOnRequestMiddleware){
+                        $m->process($this, $request, $_response);
+                    }
+                }elseif($middleware instanceof \Closure){
+                    call_user_func($middleware, [$this, $request, $_response]);
                 }
-            }elseif(is_string($middleware) && class_exists($middleware)){
-                $m = new $middleware();
-                if($m instanceof IServerOnRequestMiddleware){
-                    $m->process($this, $request, $_response);
-                }
-            }elseif($middleware instanceof \Closure){
-                call_user_func($middleware, [$this, $request, $_response]);
             }
+            //路由处理
+            $status = Router::process($client->uri, $client->method, $this->server_type);
+            //得到状态数据，响应数据
+            $_response->start($status)->send();
+        }catch (\Swoole\ExitException $exception){
+            $exit_status = $exception->getStatus();
         }
-        //路由处理
-        $status = Router::process($client->uri, $client->method, $this->server_type);
-        //得到状态数据，响应数据
-        $_response->start($status)->send();
+        //异常处理
+        if($this->server){
+            swoole_event_wait();
+            exit($exit_status);
+        }
     }
 
     /**

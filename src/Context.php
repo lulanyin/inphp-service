@@ -10,10 +10,12 @@
 // +----------------------------------------------------------------------
 namespace Inphp\Service;
 
+use Inphp\Service\Http\Response;
 use Inphp\Service\Object\Client;
 use Inphp\Service\Object\Message;
 use Inphp\Service\Object\Status;
 use Swoole\Coroutine;
+use Swoole\Http\Request;
 use Swoole\WebSocket\Frame;
 
 class Context
@@ -145,7 +147,7 @@ class Context
 
     /**
      * 获取 request 对象
-     * @return mixed|null
+     * @return Request|null
      */
     public static function getRequest(){
         return self::get('request');
@@ -153,15 +155,15 @@ class Context
 
     /**
      * 保存 request 对象到上下文
-     * @param $request
+     * @param Request $request
      */
-    public static function setRequest($request){
+    public static function setRequest(Request $request){
         self::set('request', $request);
     }
 
     /**
      * 获取 response 对象
-     * @return mixed|null
+     * @return Response
      */
     public static function getResponse(){
         return self::get('response');
@@ -169,9 +171,9 @@ class Context
 
     /**
      * 保存response对象到上下文
-     * @param $response
+     * @param Response $response
      */
-    public static function setResponse($response){
+    public static function setResponse(Response $response){
         self::set('response', $response);
     }
 
