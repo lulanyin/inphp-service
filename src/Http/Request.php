@@ -82,10 +82,10 @@ class Request
     /**
      * 保存 Cookie
      * @param string $name
-     * @param string $value
+     * @param string|null $value
      * @param int $time
      */
-    public static function setCookie(string $name, string $value, $time = 3600){
+    public static function setCookie(string $name, string $value = null, $time = 3600){
         //获取对象
         $response = Context::getResponse();
         $response->withCookie($name, $value, $time);

@@ -311,12 +311,12 @@ class Response implements IResponse
 
     /**
      * 设置cookie
-     * @param $name
-     * @param $value
+     * @param string $name
+     * @param string|null $value
      * @param int $time
      * @return Response
      */
-    public function withCookie(string $name, string $value, $time = 3600){
+    public function withCookie(string $name, string $value = null, $time = 3600){
         $this->cookies[] = [
             "name"      => $name,
             "value"     => $value,
@@ -328,11 +328,11 @@ class Response implements IResponse
     /**
      * 保存cookie
      * @param string $name
-     * @param string $value
+     * @param string|null $value
      * @param int $time
      * @return Response
      */
-    public function cookie(string $name, string $value, int $time = 3600){
+    public function cookie(string $name, string $value = null, int $time = 3600){
         return $this->withCookie($name, $value, $time);
     }
 
